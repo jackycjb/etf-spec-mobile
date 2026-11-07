@@ -201,14 +201,18 @@
   }
 
   /* ---------------- 图表 ---------------- */
+  /* 多行网格，6 只标的在手机上一屏可见，无需横向滑动 */
   .chart-picker{
-    display:flex;gap:7px;overflow-x:auto;padding:14px 1px 2px;
-    scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;
+    padding:14px 0 2px;
   }
-  .chart-picker::-webkit-scrollbar{display:none}
   .chart-chip{
-    flex:0 0 auto;padding:7px 12px;border-radius:999px;font-size:11.5px;
-    color:var(--muted);background:var(--panel2);border:1px solid var(--line);white-space:nowrap;
+    min-width:0;padding:8px 6px;border-radius:12px;font-size:12px;line-height:1.5;
+    color:var(--muted);background:var(--panel2);border:1px solid var(--line);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;
+  }
+  @media (max-width:340px){
+    .chart-picker{grid-template-columns:repeat(2,minmax(0,1fr))}
   }
   .chart-chip.active{color:var(--gold);background:rgba(240,185,11,.13);border-color:rgba(240,185,11,.5)}
   .chart-panel{
