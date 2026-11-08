@@ -293,6 +293,57 @@
     font-size:13px;color:#ffb3bd;border:1px solid #3d2a2e;
     background:linear-gradient(180deg,#2a1a1e,#20151a);
   }
+  .switch{
+    position:relative;flex:0 0 auto;width:44px;height:25px;border-radius:999px;
+    background:#242c3a;border:1px solid var(--line);transition:background .16s,border-color .16s;
+  }
+  .switch span{
+    position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;
+    background:#7d8798;transition:left .16s,background .16s;
+  }
+  .switch.on{background:#173f30;border-color:#2c6a50}
+  .switch.on span{left:21px;background:#4ade80}
+  .mini-btn{
+    flex:0 0 auto;padding:7px 11px;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);font-size:11.5px;
+  }
+  .mini-btn:disabled{opacity:.55}
+
+  /* ---------------- 信号弹窗 ---------------- */
+  body.modal-open{overflow:hidden}
+  .signal-modal{
+    position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;
+    padding:22px;background:rgba(4,7,11,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  }
+  .signal-modal.open{display:flex}
+  .signal-modal-card{
+    width:100%;max-width:360px;padding:20px 18px 16px;border-radius:20px;
+    border:1px solid #2b3546;background:linear-gradient(180deg,#1a2230,#10161f);
+    box-shadow:0 22px 70px rgba(0,0,0,.55);animation:smIn .18s ease-out;
+  }
+  @keyframes smIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+  .sm-badge{
+    display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;
+    font-size:10px;font-weight:700;letter-spacing:.4px;
+  }
+  .sm-badge.buy{color:#ff8b96;background:rgba(255,74,94,.13);border:1px solid rgba(255,74,94,.3)}
+  .sm-badge.sell{color:#67d9a3;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.28)}
+  .sm-badge.rotate{color:#f5c451;background:rgba(245,196,81,.12);border:1px solid rgba(245,196,81,.3)}
+  .sm-title{font-size:19px;font-weight:700;line-height:1.35;margin-top:10px;word-break:break-all}
+  .sm-time{font-size:10.5px;color:var(--muted);margin-top:4px;font-family:"SF Mono","Consolas",Menlo,monospace}
+  .sm-body{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+  .sm-leg{padding:10px 11px;border-radius:12px;background:#0e141d;border:1px solid #222c3a}
+  .sm-leg-head{display:flex;align-items:baseline;gap:6px;min-width:0}
+  .sm-leg-head b{font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sm-tag{flex:0 0 auto;font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px}
+  .sm-tag.buy{color:#ff8b96;background:rgba(255,74,94,.13)}
+  .sm-tag.sell{color:#67d9a3;background:rgba(34,197,94,.12)}
+  .sm-code{flex:0 0 auto;font-size:10px;color:var(--muted);font-family:"SF Mono","Consolas",Menlo,monospace}
+  .sm-leg-meta{font-size:10.5px;line-height:1.55;color:var(--muted);margin-top:5px}
+  .sm-actions{display:flex;gap:9px;margin-top:18px}
+  .sm-btn{flex:1;padding:11px 8px;border-radius:11px;font-size:12.5px;font-weight:600}
+  .sm-btn.ghost{color:var(--muted);background:#1b2330;border:1px solid #2b3546}
+  .sm-btn.primary{color:#fff;background:linear-gradient(180deg,#2a6df4,#245ad6)}
   .foot-note{
     margin-top:20px;padding-top:14px;border-top:1px solid var(--line);
     font-size:10px;line-height:1.8;color:#6c7789;
@@ -462,6 +513,25 @@
     </div>
 
     <div class="sec-head">
+      <div class="sec-title">信号提醒</div>
+      <div class="sec-sub">页面运行时生效</div>
+    </div>
+    <div class="setting-card">
+      <div class="setting-row">
+        <div class="setting-label">信号变化提醒<small>买入、卖出、换仓时弹窗并振动</small></div>
+        <button class="switch on" id="notifyToggle" role="switch" aria-checked="true" aria-label="信号变化提醒"><span></span></button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">系统通知<small id="notifyPermText">点击右侧按钮授权，未授权时仅显示页面弹窗</small></div>
+        <button class="mini-btn" id="notifyPermBtn">开启</button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">测试提醒<small>预览弹窗和通知效果</small></div>
+        <button class="mini-btn" id="notifyTestBtn">测试</button>
+      </div>
+    </div>
+
+    <div class="sec-head">
       <div class="sec-title">策略规则</div>
     </div>
     <div class="rule">
@@ -516,6 +586,19 @@
     </button>
   </div>
 </nav>
+
+<div class="signal-modal" id="signalModal" aria-hidden="true">
+  <div class="signal-modal-card" role="dialog" aria-modal="true" aria-labelledby="smTitle">
+    <div class="sm-badge buy" id="smBadge">买入信号</div>
+    <div class="sm-title" id="smTitle">—</div>
+    <div class="sm-time" id="smTime">—</div>
+    <div class="sm-body" id="smBody"></div>
+    <div class="sm-actions">
+      <button class="sm-btn ghost" id="smClose">知道了</button>
+      <button class="sm-btn primary" id="smChart">查看图表</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -626,7 +709,8 @@
     lastKlineAt: 0,
     dataTime: null,
     failCount: 0,
-    signalHistory: []
+    signalHistory: [],
+    notify: true
   };
 
   SLOTS.forEach(function (slot) { state.selection[slot.key] = slot.def; });
@@ -789,7 +873,8 @@
         retDays: params.retDays,
         maDays: params.maDays,
         refreshSec: state.refreshSec,
-        selection: state.selection
+        selection: state.selection,
+        notify: state.notify
       }));
     } catch (e) {}
   }
@@ -829,6 +914,7 @@
       state.refreshSec = p.refreshSec;
       state.secLeft = p.refreshSec;
     }
+    if (typeof p.notify === 'boolean') state.notify = p.notify;
     if (p.selection) {
       SLOTS.forEach(function (slot) {
         var code = p.selection[slot.key];
@@ -1103,6 +1189,215 @@
       sellCode: cur.sellCode,
       sellName: cur.sellName
     });
+
+    if (action.sellCode || action.buyCode) notifySignalChange(action);
+  }
+
+  function codeInfo(code) {
+    if (!code) return null;
+    var etf = byCode(code);
+    var q = state.quotes[code];
+    var m = state.metrics[code];
+    return {
+      code: code,
+      name: etf ? etf.name : nameOf(code),
+      price: q ? q.price : null,
+      dec: q && q.dec != null ? q.dec : 3,
+      pct: q ? q.pct : null,
+      ret: m ? m.ret20 : null,
+      diff: m ? m.diffPct : null,
+      above: m ? m.above : null,
+      rank: state.rank[code] || null
+    };
+  }
+
+  function signalLegHtml(leg, side) {
+    if (!leg) return '';
+    var price = leg.price != null ? leg.price.toFixed(leg.dec) : '—';
+    var pct = leg.pct != null ? signTxt(leg.pct, 2, '%') : '—';
+    var bits = [];
+    if (leg.rank) bits.push('排名第' + leg.rank);
+    if (leg.ret != null) bits.push(params.retDays + '日涨幅 ' + signTxt(leg.ret, 2, '%'));
+    if (leg.diff != null) bits.push((leg.above ? '站上' : '跌破') + params.maDays + '日线');
+    return '<div class="sm-leg ' + side + '">' +
+      '<div class="sm-leg-head"><span class="sm-tag ' + side + '">' + (side === 'buy' ? '买入' : '卖出') + '</span>' +
+      '<b>' + esc(leg.name) + '</b><span class="sm-code">' + esc(leg.code) + '</span></div>' +
+      '<div class="sm-leg-meta">现价 ' + price + ' · 今日 ' + pct + '</div>' +
+      '<div class="sm-leg-meta">' + esc(bits.join(' · ') || '信号变化') + '</div>' +
+      '</div>';
+  }
+
+  function buildSignalDetail(action) {
+    var sell = action.sellCode ? codeInfo(action.sellCode) : null;
+    var buy = action.buyCode ? codeInfo(action.buyCode) : null;
+    if (!sell && !buy) return null;
+    var type = sell && buy ? 'rotate' : (buy ? 'buy' : 'sell');
+    var badge = type === 'rotate' ? '换仓信号' : (type === 'buy' ? '买入信号' : '卖出信号');
+    var title = type === 'rotate'
+      ? '卖出 ' + sell.name + ' → 买入 ' + buy.name
+      : (type === 'buy' ? '买入 ' + buy.name : '卖出 ' + sell.name);
+    return {
+      type: type,
+      badge: badge,
+      title: title,
+      time: fmtHM(Date.now()),
+      sell: sell,
+      buy: buy
+    };
+  }
+
+  function openSignalModal(detail) {
+    if (!detail) return;
+    $('smBadge').className = 'sm-badge ' + detail.type;
+    $('smBadge').textContent = detail.badge;
+    $('smTitle').textContent = detail.title;
+    $('smTime').textContent = detail.time + ' · 页面提醒';
+    $('smBody').innerHTML = signalLegHtml(detail.sell, 'sell') + signalLegHtml(detail.buy, 'buy');
+    $('signalModal').dataset.buyCode = detail.buy ? detail.buy.code : '';
+    $('signalModal').dataset.sellCode = detail.sell ? detail.sell.code : '';
+    $('signalModal').classList.add('open');
+    $('signalModal').setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+  }
+
+  function closeSignalModal() {
+    $('signalModal').classList.remove('open');
+    $('signalModal').setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+  }
+
+  function notificationSupported() {
+    return typeof window.Notification !== 'undefined';
+  }
+
+  function sendSystemNotification(detail) {
+    if (!notificationSupported() || Notification.permission !== 'granted') return;
+    var body = detail.type === 'rotate'
+      ? '卖出 ' + detail.sell.name + '，买入 ' + detail.buy.name
+      : (detail.type === 'buy' ? '买入 ' + detail.buy.name : '卖出 ' + detail.sell.name);
+    var options = {
+      body: body,
+      tag: 'etf-signal-' + Date.now(),
+      renotify: true,
+      requireInteraction: detail.type !== 'buy'
+    };
+
+    function fallback() {
+      try {
+        var n = new Notification(detail.badge, options);
+        n.onclick = function () {
+          window.focus();
+          openSignalModal(detail);
+          n.close();
+        };
+      } catch (e) {}
+    }
+
+    if ('serviceWorker' in navigator) {
+      var done = false;
+      var timer = setTimeout(function () {
+        if (done) return;
+        done = true;
+        fallback();
+      }, 500);
+      navigator.serviceWorker.ready.then(function (reg) {
+        if (done) return;
+        return reg.showNotification(detail.badge, options).then(function () {
+          done = true;
+          clearTimeout(timer);
+        }).catch(function () {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          fallback();
+        });
+      }).catch(function () {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        fallback();
+      });
+    } else {
+      fallback();
+    }
+  }
+
+  function notifySignalChange(action) {
+    if (!state.notify) return;
+    var detail = buildSignalDetail(action);
+    if (!detail) return;
+    openSignalModal(detail);
+    sendSystemNotification(detail);
+    if (navigator.vibrate) {
+      try { navigator.vibrate(detail.type === 'buy' ? [140] : [180, 80, 180]); } catch (e) {}
+    }
+  }
+
+  function setNotifyUI() {
+    var toggle = $('notifyToggle');
+    if (!toggle) return;
+    toggle.classList.toggle('on', state.notify);
+    toggle.setAttribute('aria-checked', state.notify ? 'true' : 'false');
+
+    var btn = $('notifyPermBtn');
+    var txt = $('notifyPermText');
+    if (!notificationSupported()) {
+      btn.disabled = true;
+      btn.textContent = '不支持';
+      txt.textContent = '当前浏览器不支持系统通知，信号变化时使用页面弹窗';
+      return;
+    }
+    var perm = Notification.permission;
+    if (perm === 'granted') {
+      btn.disabled = true;
+      btn.textContent = '已开启';
+      txt.textContent = '系统通知已授权；页面在后台但未关闭时也可能收到';
+    } else if (perm === 'denied') {
+      btn.disabled = true;
+      btn.textContent = '已拒绝';
+      txt.textContent = '通知被浏览器拒绝，请在浏览器设置中允许；当前仍会显示页面弹窗';
+    } else {
+      btn.disabled = false;
+      btn.textContent = '开启';
+      txt.textContent = '点击开启系统通知；未授权时仅显示页面弹窗';
+    }
+  }
+
+  function requestNotifyPermission() {
+    if (!notificationSupported()) {
+      setNotifyUI();
+      return;
+    }
+    if (Notification.permission !== 'default') {
+      setNotifyUI();
+      return;
+    }
+    try {
+      var p = Notification.requestPermission(function () { setNotifyUI(); });
+      if (p && p.then) p.then(setNotifyUI, setNotifyUI);
+    } catch (e) {
+      setNotifyUI();
+    }
+  }
+
+  function testNotify() {
+    var info = codeInfo(state.leader || (ETFS[0] && ETFS[0].code));
+    var detail = {
+      type: 'buy',
+      badge: '测试提醒',
+      title: info ? '买入 ' + info.name : '信号提醒测试',
+      time: fmtHM(Date.now()),
+      sell: null,
+      buy: info || {
+        code: '000000', name: '测试ETF', price: null, dec: 3,
+        pct: null, ret: null, diff: null, above: null, rank: null
+      }
+    };
+    openSignalModal(detail);
+    sendSystemNotification(detail);
+    if (navigator.vibrate) {
+      try { navigator.vibrate([120, 60, 120]); } catch (e) {}
+    }
   }
 
   function shortNote(code) {
@@ -1855,11 +2150,32 @@
       savePrefs();
     });
 
+    $('notifyToggle').addEventListener('click', function () {
+      state.notify = !state.notify;
+      savePrefs();
+      setNotifyUI();
+    });
+
+    $('notifyPermBtn').addEventListener('click', requestNotifyPermission);
+    $('notifyTestBtn').addEventListener('click', testNotify);
+
+    $('smClose').addEventListener('click', closeSignalModal);
+    $('signalModal').addEventListener('click', function (e) {
+      if (e.target === $('signalModal')) closeSignalModal();
+    });
+    $('smChart').addEventListener('click', function () {
+      var code = $('signalModal').dataset.buyCode || $('signalModal').dataset.sellCode;
+      closeSignalModal();
+      if (code) selectChart(code);
+      switchTab('charts');
+    });
+
     $('resetBtn').addEventListener('click', function () {
       if (!window.confirm('恢复默认标的池与参数？')) return;
       params = { retDays: 20, maDays: 28 };
       state.refreshSec = 10;
       state.secLeft = 10;
+      state.notify = true;
       SLOTS.forEach(function (slot) { state.selection[slot.key] = slot.def; });
       rebuildEtfs();
       activeChart = ETFS.length ? ETFS[0].code : null;
@@ -1868,6 +2184,7 @@
       buildChartPicker();
       applyParams();
       savePrefs();
+      setNotifyUI();
       refresh(true);
     });
 
@@ -1931,6 +2248,10 @@
   renderParamsText();
   setSegActive();
   bindEvents();
+  setNotifyUI();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  }
   state.signalHistory = loadSignalHistory();
   renderHero();
   renderSignalChange();
