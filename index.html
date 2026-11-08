@@ -126,6 +126,27 @@
   .mini-v{font-size:16px;font-weight:700;line-height:1.3;margin-top:6px;word-break:break-all}
   .mini-s{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4}
 
+  /* ---------------- 信号变化卡 ---------------- */
+  .signal-change-card{
+    margin-top:9px;padding:11px 12px;border-radius:14px;
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line);
+  }
+  .sc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .sc-meta{
+    font-size:9.5px;color:var(--muted);white-space:nowrap;
+    font-family:"SF Mono","Consolas",Menlo,monospace;font-variant-numeric:tabular-nums;
+  }
+  .sc-meta .sep{margin:0 3px;color:#3c4658}
+  .sc-list{display:flex;flex-direction:column;gap:3px;margin-top:7px}
+  .sc-row{display:flex;align-items:baseline;gap:4px;font-size:10.5px;line-height:1.5;min-width:0}
+  .sc-row .t{flex:0 0 auto;color:var(--muted);font-family:"SF Mono","Consolas",Menlo,monospace}
+  .sc-row .act{flex:0 0 auto;font-weight:700}
+  .sc-row .act.buy{color:var(--up)}
+  .sc-row .act.sell{color:var(--down)}
+  .sc-row .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sc-empty{font-size:10.5px;color:var(--muted);margin-top:7px}
+
   .signal-list{display:flex;flex-direction:column;gap:9px}
   .etf-card{
     width:100%;display:block;text-align:left;padding:12px;
@@ -342,16 +363,13 @@
       </div>
     </div>
 
-    <div class="mini-grid">
-      <div class="mini-card">
-        <div class="mini-k" id="leaderLabel">20日涨幅第一</div>
-        <div class="mini-v" id="leaderValue">—</div>
-        <div class="mini-s" id="leaderSub">等待数据…</div>
+    <div class="signal-change-card">
+      <div class="sc-head">
+        <span class="mini-k">信号变化</span>
+        <span class="sc-meta"><span id="timeValue">—</span><span class="sep">·</span><span id="timeSub">下次刷新 —</span></span>
       </div>
-      <div class="mini-card">
-        <div class="mini-k">数据时间</div>
-        <div class="mini-v num" id="timeValue">—</div>
-        <div class="mini-s" id="timeSub">下次刷新 —</div>
+      <div class="sc-list" id="signalChangeList">
+        <div class="sc-empty">今日暂无信号变化</div>
       </div>
     </div>
 
@@ -587,6 +605,8 @@
 
   var ETFS = [];
   var PREFS_KEY = 'etf_spec_prefs_v1';
+  var SIGNAL_HISTORY_KEY = 'etf_spec_signal_history_v1';
+  var SIGNAL_STATE_KEY = 'etf_spec_signal_state_v1';
   var params = { retDays: 20, maDays: 28 };
 
   var state = {
@@ -605,7 +625,8 @@
     pendingRefresh: false,
     lastKlineAt: 0,
     dataTime: null,
-    failCount: 0
+    failCount: 0,
+    signalHistory: []
   };
 
   SLOTS.forEach(function (slot) { state.selection[slot.key] = slot.def; });
@@ -651,6 +672,15 @@
       return a;
     }, {});
     return p.month + '-' + p.day + ' ' + p.hour + ':' + p.minute;
+  }
+
+  function fmtHM(tsMs) {
+    if (!tsMs) return '—';
+    var p = BJ_DT_FMT.formatToParts(new Date(tsMs)).reduce(function (a, x) {
+      a[x.type] = x.value;
+      return a;
+    }, {});
+    return p.hour + ':' + p.minute;
   }
 
   function fmtAmount(v) {
@@ -761,6 +791,33 @@
         refreshSec: state.refreshSec,
         selection: state.selection
       }));
+    } catch (e) {}
+  }
+
+  function loadSignalHistory() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(SIGNAL_HISTORY_KEY) || '[]');
+      if (!Array.isArray(arr)) return [];
+      var today = beijingDate(new Date());
+      return arr.filter(function (x) { return x && x.date === today; });
+    } catch (e) { return []; }
+  }
+
+  function saveSignalHistory(list) {
+    try {
+      localStorage.setItem(SIGNAL_HISTORY_KEY, JSON.stringify(list.slice(-20)));
+    } catch (e) {}
+  }
+
+  function loadSignalState() {
+    try {
+      return JSON.parse(localStorage.getItem(SIGNAL_STATE_KEY) || 'null');
+    } catch (e) { return null; }
+  }
+
+  function saveSignalState(s) {
+    try {
+      localStorage.setItem(SIGNAL_STATE_KEY, JSON.stringify(s));
     } catch (e) {}
   }
 
@@ -984,6 +1041,70 @@
     return { text: '回避', cls: 'avoid', desc: '非第1名 且 跌破' + params.maDays + '日线' };
   }
 
+  // 记录“买入/持仓”状态的变化，生成当日信号流水
+  function recordSignalChange() {
+    if (!ETFS.length) return;
+    for (var i = 0; i < ETFS.length; i++) {
+      if (!state.metrics[ETFS[i].code] || !state.rank[ETFS[i].code]) return;
+    }
+
+    var buy = null;
+    ETFS.forEach(function (etf) {
+      if (adviceOf(etf.code).cls === 'buy') buy = etf;
+    });
+    var cur = {
+      holdCode: buy ? buy.code : null,
+      holdName: buy ? buy.name : null,
+      sellCode: state.sellCode || null,
+      sellName: state.sellCode ? nameOf(state.sellCode) : null
+    };
+    var today = beijingDate(new Date());
+    var prev = loadSignalState();
+    var action = { sellCode: null, sellName: null, buyCode: null, buyName: null };
+
+    // 首次运行只建立基线，不把“当前状态”误记成一次变化
+    if (prev) {
+      if (prev.holdCode && prev.holdCode !== cur.holdCode) {
+        action.sellCode = prev.holdCode;
+        action.sellName = prev.holdName || nameOf(prev.holdCode);
+      } else if (cur.sellCode && cur.sellCode !== prev.sellCode) {
+        action.sellCode = cur.sellCode;
+        action.sellName = cur.sellName;
+      }
+      if (cur.holdCode && cur.holdCode !== prev.holdCode) {
+        action.buyCode = cur.holdCode;
+        action.buyName = cur.holdName;
+      }
+    }
+
+    if (action.sellCode && action.sellCode === action.buyCode) {
+      action.sellCode = null;
+      action.sellName = null;
+    }
+
+    if (action.sellCode || action.buyCode) {
+      state.signalHistory = state.signalHistory.filter(function (x) { return x.date === today; });
+      state.signalHistory.push({
+        date: today,
+        ts: Date.now(),
+        sellCode: action.sellCode,
+        sellName: action.sellName,
+        buyCode: action.buyCode,
+        buyName: action.buyName
+      });
+      state.signalHistory = state.signalHistory.slice(-20);
+      saveSignalHistory(state.signalHistory);
+    }
+
+    saveSignalState({
+      date: today,
+      holdCode: cur.holdCode,
+      holdName: cur.holdName,
+      sellCode: cur.sellCode,
+      sellName: cur.sellName
+    });
+  }
+
   function shortNote(code) {
     var adv = adviceOf(code);
     var m = state.metrics[code];
@@ -1030,17 +1151,27 @@
     $('heroTime').textContent = state.dataTime ? '数据 ' + fmtClock(state.dataTime) : '等待行情';
   }
 
-  function renderMini() {
-    if (state.leader && state.metrics[state.leader]) {
-      var m = state.metrics[state.leader];
-      $('leaderValue').innerHTML = esc(nameOf(state.leader)) +
-        ' <span class="' + signCls(m.ret20) + '">' + signTxt(m.ret20, 2, '%') + '</span>';
-      $('leaderSub').textContent = '距' + params.maDays + '日线 ' + signTxt(m.diffPct, 2, '%') +
-        (m.above ? ' · 在均线上方' : ' · 在均线下方');
-    } else {
-      $('leaderValue').textContent = '—';
-      $('leaderSub').textContent = '等待数据…';
-    }
+  function renderSignalChange() {
+    var today = beijingDate(new Date());
+    var list = (state.signalHistory || []).filter(function (x) {
+      return x.date === today;
+    }).sort(function (a, b) {
+      return b.ts - a.ts;
+    }).slice(0, 3);
+    var html = '';
+    list.forEach(function (item) {
+      html += '<div class="sc-row"><span class="t">' + fmtHM(item.ts) + '</span>';
+      if (item.sellCode) {
+        html += '<span class="act sell">卖出</span><span class="nm">' +
+          esc(item.sellName || nameOf(item.sellCode)) + '</span>';
+      }
+      if (item.buyCode) {
+        html += '<span class="act buy">买入</span><span class="nm">' +
+          esc(item.buyName || nameOf(item.buyCode)) + '</span>';
+      }
+      html += '</div>';
+    });
+    $('signalChangeList').innerHTML = html || '<div class="sc-empty">今日暂无信号变化</div>';
 
     $('timeValue').textContent = state.dataTime ? fmtClock(state.dataTime) : '—';
     $('dataClock').textContent = state.dataTime ? fmtClock(state.dataTime) : '—';
@@ -1457,7 +1588,6 @@
   function renderParamsText() {
     var r = params.retDays;
     var m = params.maDays;
-    $('leaderLabel').textContent = r + '日涨幅第一';
     $('signalPageSub').textContent = ETFS.length + ' 只 · ' + r + '日涨幅 / MA' + m;
     $('sortRetChip').textContent = r + '日涨幅';
     $('sortRankChip').textContent = r + '日排名';
@@ -1491,7 +1621,7 @@
   function renderAll() {
     renderParamsText();
     renderHero();
-    renderMini();
+    renderSignalChange();
     renderSignalList();
     renderQuoteList();
     syncChartOrder();
@@ -1590,6 +1720,7 @@
 
         computeAll();
         computeSignals();
+        recordSignalChange();
 
         var latest = 0;
         ETFS.forEach(function (etf) {
@@ -1600,8 +1731,7 @@
 
         renderAll();
 
-        var hasTarget = ETFS.some(function (etf) { return adviceOf(etf.code).cls === 'buy'; });
-        setStatus('live', '实时 · ' + (state.sellCode ? '卖出信号' : (hasTarget ? '买入/持仓信号' : '空仓观望')));
+        setStatus('live', '实时');
         updateMarketChip();
         updatePoolText();
 
@@ -1615,7 +1745,7 @@
       if (!Object.keys(state.quotes).length) {
         renderEmpty('行情数据获取失败，请检查网络后点击右上角刷新');
         renderHero();
-        renderMini();
+        renderSignalChange();
       }
     }).then(function () {
       state.busy = false;
@@ -1801,8 +1931,9 @@
   renderParamsText();
   setSegActive();
   bindEvents();
+  state.signalHistory = loadSignalHistory();
   renderHero();
-  renderMini();
+  renderSignalChange();
   renderSignalList();
   renderQuoteList();
   renderChartMeta();
