@@ -634,7 +634,7 @@
       { code: '159949', secid: '0.159949', name: '创业板50ETF' },
       { code: '512480', secid: '1.512480', name: '半导体ETF' },
       { code: '159583', secid: '0.159583', name: '通信ETF' },
-      { code: '515790', secid: '1.515790', name: '光伏ETF' },
+      { code: '562500', secid: '1.562500', name: '机器人ETF' },
       { code: '512010', secid: '1.512010', name: '医药ETF' },
       { code: '159992', secid: '0.159992', name: '创新药ETF' },
       { code: '512660', secid: '1.512660', name: '军工ETF' },
@@ -769,6 +769,15 @@
       return a;
     }, {});
     return p.hour + ':' + p.minute;
+  }
+
+  function fmtHMS(tsMs) {
+    if (!tsMs) return '—';
+    var d = new Date(tsMs);
+    return d.toLocaleTimeString('zh-CN', {
+      timeZone: 'Asia/Shanghai', hour12: false,
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
   }
 
   function fmtAmount(v) {
@@ -1002,6 +1011,30 @@
         return { date: a[0], o: +a[1], c: +a[2], h: +a[3], l: +a[4], v: +a[5], amt: +a[6] };
       });
     });
+  }
+
+  function fillQuotesFromKline() {
+    var filled = 0;
+    ETFS.forEach(function (etf) {
+      var bars = state.klines[etf.code];
+      if (!bars || bars.length < 2) return;
+      var last = bars[bars.length - 1];
+      var prev = bars[bars.length - 2];
+      if (!last || !isFinite(last.c) || !last.c) return;
+      state.quotes[etf.code] = {
+        price: last.c,
+        dec: 3,
+        change: isFinite(prev.c) ? last.c - prev.c : null,
+        pct: prev.c ? (last.c / prev.c - 1) * 100 : null,
+        amount: isFinite(last.amt) ? last.amt : null,
+        turnover: null,
+        time: null,
+        date: last.date,
+        stale: true
+      };
+      filled++;
+    });
+    return filled;
   }
 
   /* ================= 策略计算 ================= */
@@ -1948,6 +1981,7 @@
     var day = bj.getDay();
     var mins = bj.getHours() * 60 + bj.getMinutes();
     var weekday = day >= 1 && day <= 5;
+    if (weekday && mins < 570) return 'pre';
     if (weekday && ((mins >= 570 && mins <= 690) || (mins >= 780 && mins <= 900))) return 'open';
     if (weekday && mins > 690 && mins < 780) return 'lunch';
     return 'closed';
@@ -1956,7 +1990,8 @@
   function updateMarketChip() {
     var st = marketState();
     $('marketChip').className = 'chip market' + (st === 'open' ? ' live' : '');
-    $('marketText').textContent = st === 'open' ? '交易中' : (st === 'lunch' ? '午休' : '已收盘');
+    $('marketText').textContent = st === 'open' ? '交易中'
+      : (st === 'lunch' ? '午休' : (st === 'pre' ? '盘前' : '已收盘'));
   }
 
   function effectiveInterval() {
@@ -2015,7 +2050,10 @@
       }
 
       return chain.then(function () {
-        if (okCount === 0) throw new Error('all quotes failed');
+        if (okCount === 0) fillQuotesFromKline();
+
+        var haveQuotes = ETFS.some(function (etf) { return !!state.quotes[etf.code]; });
+        if (!haveQuotes) throw new Error('no quotes');
 
         computeAll();
         computeSignals();
@@ -2030,8 +2068,12 @@
 
         renderAll();
 
-        setStatus('live', '实时');
         updateMarketChip();
+        if (okCount === 0) {
+          setStatus('', '未开盘 · 显示上一交易日收盘');
+        } else {
+          setStatus('live', '实时 · ' + fmtHMS(latest * 1000));
+        }
         updatePoolText();
 
         state.failCount = 0;
