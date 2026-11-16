@@ -513,16 +513,18 @@
   .cfg-res .s-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cfg-res .s-code{flex:0 0 auto;font-size:10.5px;color:var(--muted);font-family:"SF Mono",Consolas,monospace}
   .cfg-res .s-mv{flex:0 0 auto;font-size:10.5px;color:var(--muted);font-family:"SF Mono",Consolas,monospace}
+  .cfg-item{flex-wrap:wrap}
   .cfg-item .cfg-main{flex:1;min-width:0}
   .cfg-item .cfg-line1{display:flex;align-items:baseline;gap:6px;min-width:0}
   .cfg-item .mt{
-    display:block;margin-top:2px;font-size:9.5px;color:var(--muted);line-height:1.4;
-    font-family:"SF Mono",Consolas,monospace;white-space:normal;word-break:break-word;
+    display:block;flex:0 0 100%;width:100%;margin-top:3px;padding-left:24px;
+    font-size:9px;color:var(--muted);line-height:1.3;
+    font-family:"SF Mono",Consolas,monospace;white-space:nowrap;
   }
   .cfg-res{flex-wrap:wrap}
   .cfg-res .s-meta{
-    flex:0 0 100%;margin-top:1px;font-size:9.5px;color:var(--muted);line-height:1.4;
-    font-family:"SF Mono",Consolas,monospace;white-space:normal;word-break:break-word;
+    flex:0 0 100%;width:100%;margin-top:1px;font-size:9px;color:var(--muted);line-height:1.3;
+    font-family:"SF Mono",Consolas,monospace;white-space:nowrap;
   }
   .cfg-msg{font-size:10.5px;color:var(--muted);padding:4px 2px}
   .cfg-empty{
@@ -3833,8 +3835,8 @@
   function metaText(code) {
     var m = secMeta[code] || {};
     return (isT0(code) ? 'T+0' : 'T+1') +
-      ' · 市值 ' + fmtMv(m.mv) +
-      ' · 上市 ' + fmtListedYears(m.ld);
+      ' · 市值' + fmtMv(m.mv) +
+      ' · 上市' + fmtListedYears(m.ld);
   }
 
   function fmtMv(v) {
@@ -3895,14 +3897,15 @@
       h += '<div class="cfg-main"><div class="cfg-line1">';
       h += '<span class="nm">' + esc(it.name) + '</span>';
       h += '<span class="cd">' + it.code + '</span>';
-      h += '</div>';
-      h += '<span class="mt" data-meta="' + escAttr(it.code) + '">' + metaText(it.code) + '</span></div>';
+      h += '</div></div>';
       h += '<div class="btns">';
       h += '<button data-act="itemup" data-code="' + it.code + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>';
       h += '<button data-act="itemdown" data-code="' + it.code + '"' +
         (i === cat.items.length - 1 ? ' disabled' : '') + '>↓</button>';
       h += '<button data-act="itemdel" data-code="' + it.code + '">✕</button>';
-      h += '</div></div>';
+      h += '</div>';
+      h += '<span class="mt" data-meta="' + escAttr(it.code) + '">' + metaText(it.code) + '</span>';
+      h += '</div>';
     });
 
     var st = cfgSearch[cat.id];
