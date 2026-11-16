@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#0a0d12" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="ETF_SPEC" />
-<title>ETF_SPEC · ETF大类轮动</title>
+<meta name="apple-mobile-web-app-title" content="ETF_TAB" />
+<title>ETF_TAB · ETF大类轮动</title>
 <style>
   :root{
     --bg:#0a0d12;
@@ -84,6 +84,17 @@
   .icon-btn svg{width:18px;height:18px}
   .icon-btn.busy svg{animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
+  .run-btn{
+    display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;
+    border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.4px;
+    border:1px solid transparent;white-space:nowrap;
+    transition:background .15s ease,border-color .15s ease,color .15s ease;
+  }
+  .run-btn i{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+  .run-btn.stop{color:#2ebd85;background:rgba(46,189,133,.16);border-color:rgba(46,189,133,.48)}
+  .run-btn.start{color:#f6465d;background:rgba(246,70,93,.16);border-color:rgba(246,70,93,.48)}
+  .run-btn.busy i{animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
   .statusline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}
   .status-right{font-size:10.5px;color:var(--muted);font-family:"SF Mono",Consolas,monospace;white-space:nowrap}
   .status-right .sep{margin:0 4px;color:#3c4658}
@@ -328,7 +339,7 @@
   }
   .sm-badge.buy{color:#ff8b96;background:rgba(255,74,94,.13);border:1px solid rgba(255,74,94,.3)}
   .sm-badge.sell{color:#67d9a3;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.28)}
-  .sm-badge.rotate{color:#f5c451;background:rgba(245,196,81,.12);border:1px solid rgba(245,196,81,.3)}
+  .sm-badge.rotate,.sm-badge.switch{color:#f5c451;background:rgba(245,196,81,.12);border:1px solid rgba(245,196,81,.3)}
   .sm-title{font-size:19px;font-weight:700;line-height:1.35;margin-top:10px;word-break:break-all}
   .sm-time{font-size:10.5px;color:var(--muted);margin-top:4px;font-family:"SF Mono","Consolas",Menlo,monospace}
   .sm-body{display:flex;flex-direction:column;gap:9px;margin-top:14px}
@@ -367,6 +378,183 @@
   .tab-btn.active{color:var(--gold)}
   .tab-btn.active svg{filter:drop-shadow(0 0 6px rgba(240,185,11,.35))}
 
+  /* ---------------- T+0 / 参数输入 / 图表切换 ---------------- */
+  .t0tag{
+    display:inline-block;margin-left:5px;padding:0 4px;border-radius:4px;
+    font-size:9px;line-height:15px;color:#8fb6ff;vertical-align:1px;
+    background:rgba(76,141,255,.13);border:1px solid rgba(76,141,255,.32);
+  }
+  .t0tag.t1{color:#9aa5b8;background:rgba(138,149,168,.10);border-color:rgba(138,149,168,.26)}
+  .setting-input{
+    width:86px;padding:8px 10px;border-radius:9px;font-size:16px;text-align:right;
+    color:var(--text);background:var(--panel2);border:1px solid var(--line);
+    outline:none;font-family:"SF Mono",Consolas,monospace;font-variant-numeric:tabular-nums;
+  }
+  .setting-input:focus{border-color:var(--gold)}
+  .param-line{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+  .param-line .unit{font-size:11px;color:var(--muted)}
+  .param-line .seg{flex:1;min-width:158px;margin-top:0}
+  .sc-more{
+    width:100%;margin-top:8px;padding:8px;border-radius:10px;
+    border:1px dashed var(--line);font-size:11px;color:var(--gold);
+    background:rgba(240,185,11,.05);
+  }
+  .chart-mode{
+    display:flex;gap:3px;margin-top:14px;padding:3px;border-radius:10px;
+    background:#0e131b;border:1px solid var(--line);
+  }
+  .chart-mode button{flex:1;padding:7px 4px;border-radius:7px;font-size:12px;color:var(--muted)}
+  .chart-mode button.active{color:#fff;background:#243044}
+
+  /* ---------------- 全屏面板：配置 / 历史信号 ---------------- */
+  body.locked{overflow:hidden}
+  .sheet-mask{
+    position:fixed;inset:0;z-index:120;display:none;
+    background:rgba(4,7,11,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  }
+  .sheet-mask.open{display:flex}
+  .sheet{
+    width:100%;max-width:600px;height:100%;margin:0 auto;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,#141a24,#0b0f15);
+    padding-top:env(safe-area-inset-top, 0px);
+  }
+  .sheet-head{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:12px 14px;border-bottom:1px solid var(--line);flex:0 0 auto;
+  }
+  .sheet-title{font-size:16px;font-weight:700}
+  .sheet-sub{font-size:10.5px;color:var(--muted);margin-top:2px}
+  .sheet-x{
+    width:32px;height:32px;flex:0 0 auto;border-radius:9px;font-size:18px;line-height:1;
+    border:1px solid var(--line);background:var(--panel2);color:var(--muted);
+  }
+  .sheet-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 18px}
+  .sheet-foot{
+    display:flex;gap:8px;padding:10px 14px calc(10px + var(--safe-bottom));
+    border-top:1px solid var(--line);background:rgba(15,19,26,.96);flex:0 0 auto;
+  }
+  .sheet-foot button{
+    flex:1;padding:11px 8px;border-radius:10px;font-size:13px;
+    border:1px solid var(--line);background:var(--panel2);
+  }
+  .sheet-foot button.primary{
+    flex:1.5;color:#fff;border-color:#2e62c9;
+    background:linear-gradient(180deg,#2a6df4,#245ad6);
+  }
+
+  .cfg-sec{
+    display:flex;align-items:center;gap:7px;margin:14px 2px 8px;
+    font-size:12.5px;font-weight:700;color:var(--text);
+  }
+  .cfg-sec:before{content:"";width:3px;height:13px;border-radius:2px;background:var(--gold);display:inline-block}
+  .cfg-sec:first-child{margin-top:0}
+  .cfg-param-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .cfg-field{
+    padding:9px 10px;border-radius:11px;border:1px solid var(--line);
+    background:var(--panel);
+  }
+  .cfg-field span{display:block;font-size:10px;color:var(--muted);margin-bottom:5px}
+  .cfg-field input{
+    width:100%;border:none;background:transparent;outline:none;
+    font-size:17px;color:var(--text);font-family:"SF Mono",Consolas,monospace;
+    font-variant-numeric:tabular-nums;
+  }
+  .cfg-note{font-size:10px;line-height:1.6;color:#6c7789;margin:8px 2px 0}
+  .cfg-cat{
+    padding:11px;margin-bottom:10px;border-radius:14px;
+    border:1px solid var(--line);background:var(--panel);
+  }
+  .cfg-cat-head{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+  .cfg-cat-no{
+    width:22px;height:22px;flex:0 0 auto;border-radius:6px;border:1px solid var(--line);
+    background:#1b222d;color:var(--muted);font-size:11px;font-weight:700;
+    display:inline-flex;align-items:center;justify-content:center;
+  }
+  .cfg-cat-name{
+    flex:1;min-width:0;padding:7px 9px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);font-size:13px;font-weight:600;
+    outline:none;font-family:inherit;
+  }
+  .cfg-cat-tools{display:flex;gap:4px;flex:0 0 auto}
+  .cfg-cat-tools button,.cfg-item .btns button{
+    width:26px;height:26px;padding:0;border-radius:6px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--muted);font-size:12px;line-height:1;
+    display:inline-flex;align-items:center;justify-content:center;
+  }
+  .cfg-cat-tools button:disabled,.cfg-item .btns button:disabled{opacity:.3}
+  .cfg-item{
+    display:flex;align-items:center;gap:6px;padding:6px 7px;margin-bottom:5px;
+    border-radius:8px;border:1px solid var(--line);background:var(--panel2);
+    font-size:12px;min-width:0;
+  }
+  .cfg-item .no{
+    width:18px;height:18px;flex:0 0 auto;border-radius:5px;background:#1b222d;
+    color:var(--muted);font-size:10px;display:inline-flex;align-items:center;justify-content:center;
+  }
+  .cfg-item .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .cfg-item .cd{flex:0 0 auto;font-size:10px;color:var(--muted);font-family:"SF Mono",Consolas,monospace}
+  .cfg-item .btns{display:flex;gap:3px;flex:0 0 auto}
+  .cfg-add{display:flex;gap:6px;margin-top:7px}
+  .cfg-add input{
+    flex:1;min-width:0;padding:8px 9px;border-radius:8px;border:1px solid var(--line);
+    background:#0f141c;color:var(--text);font-size:13px;outline:none;font-family:inherit;
+  }
+  .cfg-add input:focus{border-color:#3b4a63}
+  .cfg-add button{
+    flex:0 0 auto;padding:0 12px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--gold);font-size:12px;
+  }
+  .cfg-results{display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:210px;overflow-y:auto}
+  .cfg-res{
+    display:flex;align-items:center;gap:6px;width:100%;padding:7px 8px;text-align:left;
+    border-radius:7px;border:1px solid var(--line);background:#181f2a;color:var(--text);
+    font-size:12px;min-width:0;
+  }
+  .cfg-res .s-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cfg-res .s-code{flex:0 0 auto;font-size:10.5px;color:var(--muted);font-family:"SF Mono",Consolas,monospace}
+  .cfg-res .s-mv{flex:0 0 auto;font-size:10.5px;color:var(--muted);font-family:"SF Mono",Consolas,monospace}
+  .cfg-msg{font-size:10.5px;color:var(--muted);padding:4px 2px}
+  .cfg-empty{
+    padding:12px;margin-bottom:8px;border-radius:9px;border:1px dashed var(--line);
+    text-align:center;font-size:11px;color:var(--muted);line-height:1.6;
+  }
+  .cfg-addcat{
+    width:100%;padding:10px;border-radius:11px;border:1px dashed var(--line);
+    font-size:12px;color:var(--gold);background:rgba(240,185,11,.05);
+  }
+
+  /* ---------------- 历史信号 ---------------- */
+  .hist-filter{
+    display:flex;gap:6px;padding:9px 14px;border-bottom:1px solid var(--line);
+    overflow-x:auto;flex:0 0 auto;scrollbar-width:none;
+  }
+  .hist-filter::-webkit-scrollbar{display:none}
+  .hist-chip{
+    flex:0 0 auto;padding:5px 11px;border-radius:999px;font-size:11px;color:var(--muted);
+    background:var(--panel2);border:1px solid var(--line);white-space:nowrap;
+  }
+  .hist-chip.active{color:var(--gold);border-color:rgba(240,185,11,.45);background:rgba(240,185,11,.12)}
+  .hist-list{padding:2px 14px}
+  .hist-item{display:flex;gap:9px;padding:11px 0;border-bottom:1px solid rgba(35,43,56,.6)}
+  .hist-time{
+    flex:0 0 72px;font-size:10px;color:var(--muted);line-height:1.5;
+    font-family:"SF Mono",Consolas,monospace;
+  }
+  .hist-main{flex:1;min-width:0}
+  .hist-desc{font-size:12.5px;line-height:1.5;word-break:break-all}
+  .hist-desc b{font-weight:600}
+  .hist-desc .up{color:var(--up)}
+  .hist-desc .down{color:var(--down)}
+  .hist-meta{font-size:10px;color:#6c7789;margin-top:3px;line-height:1.5}
+  .hist-badge{
+    flex:0 0 auto;height:20px;padding:0 7px;border-radius:6px;font-size:10px;font-weight:700;
+    display:inline-flex;align-items:center;
+  }
+  .hist-badge.buy{color:#ff8095;background:rgba(246,70,93,.15)}
+  .hist-badge.sell{color:#5fd0a9;background:rgba(46,189,133,.14)}
+  .hist-badge.switch{color:var(--gold);background:rgba(240,185,11,.13)}
+  .hist-empty{padding:30px 10px;text-align:center;font-size:11.5px;color:var(--muted);line-height:1.8}
+
   @media (min-width:600px){
     .page{padding-left:20px;padding-right:20px}
     .appbar-inner{padding-left:20px;padding-right:20px}
@@ -381,16 +569,14 @@
       <div class="brand">
         <span class="brand-dot"></span>
         <div class="brand-text">
-          <strong>ETF_SPEC</strong>
-          <span>ETF 大类轮动策略</span>
+          <strong>ETF_TAB</strong>
+          <span>ETF 大类轮动 · 移动版</span>
         </div>
       </div>
       <div class="top-actions">
         <span class="chip market" id="marketChip"><i></i><span id="marketText">—</span></span>
-        <button class="icon-btn" id="refreshBtn" aria-label="立即刷新">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path>
-          </svg>
+        <button class="run-btn start" id="runBtn" aria-label="启动策略">
+          <i></i><span id="runText">启动</span>
         </button>
       </div>
     </div>
@@ -422,6 +608,7 @@
       <div class="sc-list" id="signalChangeList">
         <div class="sc-empty">今日暂无信号变化</div>
       </div>
+      <button class="sc-more" id="histBtn">查看历史信号 ›</button>
     </div>
 
     <div class="sec-head">
@@ -442,6 +629,8 @@
       <button class="sort-chip" data-sort="pct">今日涨幅</button>
       <button class="sort-chip" data-sort="ret20" id="sortRetChip">20日涨幅</button>
       <button class="sort-chip" data-sort="rank" id="sortRankChip">20日排名</button>
+      <button class="sort-chip" data-sort="premium">溢价率</button>
+      <button class="sort-chip" data-sort="amount">成交额</button>
     </div>
     <div class="quote-list" id="quoteList"><div class="empty">行情加载中…</div></div>
   </section>
@@ -449,6 +638,10 @@
   <!-- 图表 -->
   <section class="page" id="page-charts">
     <div class="chart-picker" id="chartPicker"></div>
+    <div class="chart-mode" id="chartMode">
+      <button data-mode="kline" class="active">日 K</button>
+      <button data-mode="trend">分时</button>
+    </div>
     <div class="chart-panel">
       <div class="chart-head">
         <div>
@@ -469,14 +662,14 @@
         <span id="chartFootRight">—</span>
       </div>
     </div>
-    <div class="chart-hint">点按 / 滑动图表查看每日开高低收与均线</div>
+    <div class="chart-hint" id="chartHint">点按 / 滑动图表查看每日开高低收与均线</div>
   </section>
 
   <!-- 设置 -->
   <section class="page" id="page-settings">
     <div class="sec-head">
       <div class="sec-title">标的池</div>
-      <div class="sec-sub">六大类可独立切换</div>
+      <button class="mini-btn" id="cfgBtn">配置标的池</button>
     </div>
     <div class="setting-card" id="poolSettings"></div>
 
@@ -486,19 +679,36 @@
     </div>
     <div class="setting-card">
       <div class="setting-block">
-        <div class="setting-label">涨幅统计日数<small>用于排名与买卖信号判断</small></div>
-        <div class="seg" id="retSeg" data-param="retDays">
-          <button data-value="10">10 日</button>
-          <button data-value="20" class="active">20 日</button>
-          <button data-value="40">40 日</button>
+        <div class="setting-label">涨幅统计日数<small>5–240 日，用于排名与买卖信号判断</small></div>
+        <div class="param-line">
+          <input class="setting-input" id="retDaysInput" type="number" min="5" max="240" step="1" inputmode="numeric" value="20">
+          <span class="unit">日</span>
+          <div class="seg" id="retSeg" data-param="retDays">
+            <button data-value="10">10</button>
+            <button data-value="20" class="active">20</button>
+            <button data-value="40">40</button>
+          </div>
         </div>
       </div>
       <div class="setting-block">
-        <div class="setting-label">均线日数<small>站上 / 跌破均线作为过滤条件</small></div>
-        <div class="seg" id="maSeg" data-param="maDays">
-          <button data-value="14">14 日</button>
-          <button data-value="28" class="active">28 日</button>
-          <button data-value="56">56 日</button>
+        <div class="setting-label">均线日数<small>5–240 日，站上 / 跌破均线作为过滤条件</small></div>
+        <div class="param-line">
+          <input class="setting-input" id="maDaysInput" type="number" min="5" max="240" step="1" inputmode="numeric" value="28">
+          <span class="unit">日</span>
+          <div class="seg" id="maSeg" data-param="maDays">
+            <button data-value="14">14</button>
+            <button data-value="28" class="active">28</button>
+            <button data-value="56">56</button>
+          </div>
+        </div>
+      </div>
+      <div class="setting-block">
+        <div class="setting-label">换仓防抖<small>原持仓未跌破均线时，新第1名需领先指定幅度并持续指定时间才换仓</small></div>
+        <div class="param-line">
+          <input class="setting-input" id="leadGapInput" type="number" min="0" max="5" step="0.1" inputmode="decimal" value="0.3">
+          <span class="unit">% 领先</span>
+          <input class="setting-input" id="leadHoldInput" type="number" min="0" max="600" step="10" inputmode="numeric" value="60">
+          <span class="unit">秒</span>
         </div>
       </div>
       <div class="setting-block">
@@ -536,7 +746,7 @@
     </div>
     <div class="rule">
       <h3><i></i>买入 / 持仓条件（需同时满足）</h3>
-      <p id="ruleBuy">① 六个标的中<b>近20日涨幅排名第一</b>；② 价格<b>站上28日均线</b>。同时满足即买入 / 持仓排名第一的强势 ETF。</p>
+      <p id="ruleBuy">① 标的池中<b>近20日涨幅排名第一</b>；② 价格<b>站上28日均线</b>。同时满足即买入 / 持仓排名第一的强势 ETF。</p>
     </div>
     <div class="rule sell">
       <h3><i></i>卖出 / 换仓条件（任一触发）</h3>
@@ -544,13 +754,13 @@
     </div>
     <div class="rule cash">
       <h3><i></i>空仓铁律</h3>
-      <p>六个标的<b>全部走弱、无一同时满足</b>买入 / 持仓条件时，<b>直接空仓</b>等待。空仓本身就是最高级的风控。</p>
+      <p id="ruleCash">标的池<b>全部走弱、无一同时满足</b>买入 / 持仓条件时，<b>直接空仓</b>等待。空仓本身就是最高级的风控。</p>
     </div>
 
     <button class="reset-btn" id="resetBtn">恢复默认设置</button>
 
     <div class="foot-note">
-      本页面为策略规则可视化工具，行情数据来自东方财富公开接口，仅供学习研究，不构成任何投资建议。ETF 交易存在风险，历史回测收益不代表未来表现。<br />
+      本页面为策略规则可视化工具，行情数据来自东方财富公开接口，仅供学习研究，不构成任何投资建议。ETF 交易存在风险，历史表现不代表未来表现。<br />
       当前标的池：<span id="poolText">—</span>
     </div>
   </section>
@@ -600,13 +810,56 @@
   </div>
 </div>
 
+<!-- 配置标的池 / 参数 -->
+<div class="sheet-mask" id="cfgMask" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cfgTitle">
+    <div class="sheet-head">
+      <div>
+        <div class="sheet-title" id="cfgTitle">配置</div>
+        <div class="sheet-sub" id="cfgHint">—</div>
+      </div>
+      <button class="sheet-x" id="cfgX" aria-label="关闭">×</button>
+    </div>
+    <div class="sheet-body" id="cfgBody"></div>
+    <div class="sheet-foot">
+      <button id="cfgReset">恢复默认</button>
+      <button id="cfgCancel">取消</button>
+      <button class="primary" id="cfgSave">保存并应用</button>
+    </div>
+  </div>
+</div>
+
+<!-- 历史信号 -->
+<div class="sheet-mask" id="histMask" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="histTitle">
+    <div class="sheet-head">
+      <div>
+        <div class="sheet-title" id="histTitle">历史信号</div>
+        <div class="sheet-sub" id="histSub">—</div>
+      </div>
+      <button class="sheet-x" id="histX" aria-label="关闭">×</button>
+    </div>
+    <div class="hist-filter" id="histFilter">
+      <button class="hist-chip active" data-filter="all">全部</button>
+      <button class="hist-chip" data-filter="buy">买入</button>
+      <button class="hist-chip" data-filter="sell">卖出</button>
+      <button class="hist-chip" data-filter="switch">换仓</button>
+    </div>
+    <div class="sheet-body hist-list" id="histList"></div>
+    <div class="sheet-foot">
+      <button id="histClear">清空记录</button>
+      <button class="primary" id="histClose">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
 
   /* ================= 标的池配置 ================= */
 
-  var SLOTS = [
+  var DEFAULT_SLOTS = [
     { key: 'broad',     label: '宽基', role: 'A股宽基', def: '510300' },
     { key: 'growth',    label: '成长', role: 'A股成长', def: '159915' },
     { key: 'hk',        label: '港股', role: '香港ETF', def: '513050' },
@@ -614,6 +867,9 @@
     { key: 'commodity', label: '商品', role: '商品ETF', def: '518880' },
     { key: 'bond',      label: '债券', role: '债券ETF', def: '511260' }
   ];
+
+  var MAX_CATS = 10;
+  var MAX_ITEMS = 12;
 
   var CATALOG = {
     broad: [
@@ -691,10 +947,15 @@
   };
 
   var ETFS = [];
-  var PREFS_KEY = 'etf_spec_prefs_v1';
-  var SIGNAL_HISTORY_KEY = 'etf_spec_signal_history_v1';
-  var SIGNAL_STATE_KEY = 'etf_spec_signal_state_v1';
-  var params = { retDays: 20, maDays: 28 };
+  var PREFS_KEY = 'etf_tab_mobile_prefs_v1';
+  var LEGACY_PREFS_KEY = 'etf_spec_prefs_v1';
+  var SIGNAL_HISTORY_KEY = 'etf_tab_mobile_signal_history_v1';
+  var SIGNAL_STATE_KEY = 'etf_tab_mobile_signal_state_v1';
+  var HOLD_KEY = 'etf_tab_mobile_holdhist_v1';
+  var HISTORY_MAX = 400;
+
+  var params = { retDays: 20, maDays: 28, leadGap: 0.3, leadHold: 60 };
+  var config = defaultConfig();
 
   var state = {
     quotes: {},
@@ -704,8 +965,16 @@
     selection: {},
     leader: null,
     prevDate: null,
+    prevHeld: null,
     heldCode: null,
     sellCode: null,
+    heldIntraday: false,
+    heldTime: '',
+    heldCount: 0,
+    streak: {},
+    sigStore: loadSigStore(),
+    sigPend: null,
+    sigSuppress: false,
     refreshSec: 10,
     secLeft: 10,
     busy: false,
@@ -714,10 +983,75 @@
     dataTime: null,
     failCount: 0,
     signalHistory: [],
-    notify: true
+    notify: true,
+    running: false
   };
 
-  SLOTS.forEach(function (slot) { state.selection[slot.key] = slot.def; });
+  var chartMode = 'kline';
+  var trendState = { code: null, loading: false, error: false, points: [], preClose: null, dec: 3, fetchedAt: 0 };
+  var histFilter = 'all';
+  var cfgDraft = null;
+  var cfgSearch = {};
+
+  function defaultConfig() {
+    return {
+      categories: DEFAULT_SLOTS.map(function (slot) {
+        return {
+          id: slot.key,
+          name: slot.label,
+          role: slot.role,
+          items: CATALOG[slot.key].map(function (x) {
+            return { code: x.code, secid: x.secid, name: x.name };
+          })
+        };
+      })
+    };
+  }
+
+  function secidOfCode(code) {
+    return /^(5|6|9)/.test(code) ? '1.' + code : '0.' + code;
+  }
+
+  function normItem(x) {
+    if (!x) return null;
+    var code = String(x.code || '').trim();
+    if (!/^\d{6}$/.test(code)) return null;
+    return { code: code, secid: x.secid || secidOfCode(code), name: String(x.name || code) };
+  }
+
+  function normalizeConfig(raw) {
+    if (!raw || !Array.isArray(raw.categories)) return defaultConfig();
+    var cats = [];
+    raw.categories.forEach(function (c, i) {
+      if (!c || !Array.isArray(c.items)) return;
+      var items = [];
+      var seen = {};
+      c.items.forEach(function (x) {
+        var it = normItem(x);
+        if (!it || seen[it.code]) return;
+        seen[it.code] = true;
+        items.push(it);
+      });
+      if (!items.length) return;
+      cats.push({
+        id: String(c.id || ('cat' + (i + 1))),
+        name: String(c.name || ('类目' + (i + 1))).slice(0, 12),
+        role: String(c.role || '自定义'),
+        items: items.slice(0, MAX_ITEMS)
+      });
+    });
+    return cats.length ? { categories: cats.slice(0, MAX_CATS) } : defaultConfig();
+  }
+
+  function isT0(code) {
+    return /^(51|56|58|513|518)/.test(code);
+  }
+
+  function t0Html(code) {
+    return isT0(code)
+      ? '<span class="t0tag">T+0</span>'
+      : '<span class="t0tag t1">T+1</span>';
+  }
 
   var $ = function (id) { return document.getElementById(id); };
   var currentTab = 'strategy';
@@ -725,7 +1059,9 @@
   var activeChart = null;
   var displaySort = '';
   var chartHover = -1;
+  var trendHover = -1;
   var chartGeo = null;
+  var trendGeo = null;
   var pointerDown = false;
 
   /* ================= 通用工具 ================= */
@@ -734,6 +1070,10 @@
     return String(s).replace(/[&<>"]/g, function (c) {
       return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c];
     });
+  }
+
+  function escAttr(s) {
+    return esc(s).replace(/'/g, '&#39;');
   }
 
   var BJ_DATE_FMT = new Intl.DateTimeFormat('zh-CN', {
@@ -815,49 +1155,68 @@
   /* ================= 标的池 ================= */
 
   function rebuildEtfs() {
-    ETFS = SLOTS.map(function (slot) {
-      var list = CATALOG[slot.key];
-      var code = state.selection[slot.key];
-      var item = list[0];
-      for (var i = 0; i < list.length; i++) if (list[i].code === code) item = list[i];
-      return { code: item.code, secid: item.secid, name: item.name, role: slot.role };
+    var seen = {};
+    ETFS = [];
+    config.categories.forEach(function (cat) {
+      if (!cat.items.length) return;
+      var code = state.selection[cat.id];
+      var item = null;
+      cat.items.forEach(function (x) { if (x.code === code) item = x; });
+      if (!item) item = cat.items[0];
+      state.selection[cat.id] = item.code;
+      if (seen[item.code]) return;
+      seen[item.code] = true;
+      ETFS.push({
+        code: item.code, secid: item.secid, name: item.name,
+        role: cat.name, catId: cat.id
+      });
     });
     if (!activeChart || !byCode(activeChart)) activeChart = ETFS.length ? ETFS[0].code : null;
   }
 
   function buildPoolSelectors() {
     var box = $('poolSettings');
+    if (!box) return;
     box.innerHTML = '';
-    SLOTS.forEach(function (slot) {
+    config.categories.forEach(function (cat) {
       var row = document.createElement('div');
       row.className = 'setting-row';
 
+      var current = null;
+      cat.items.forEach(function (x) { if (x.code === state.selection[cat.id]) current = x; });
+
       var label = document.createElement('div');
       label.className = 'setting-label';
-      label.innerHTML = esc(slot.label) + '<small>' + esc(slot.role) + '</small>';
+      label.innerHTML = esc(cat.name) + '<small>' +
+        esc(current ? current.name + ' · ' + current.code : '未选择标的') + '</small>';
 
       var sel = document.createElement('select');
       sel.className = 'setting-select';
-      CATALOG[slot.key].forEach(function (item) {
+      cat.items.forEach(function (item) {
         var opt = document.createElement('option');
         opt.value = item.code;
         opt.textContent = item.name + ' ' + item.code;
         sel.appendChild(opt);
       });
-      sel.value = state.selection[slot.key];
-      sel.addEventListener('change', function () { onPoolChange(slot.key, sel.value); });
+      sel.value = state.selection[cat.id];
+      sel.addEventListener('change', function () { onPoolChange(cat.id, sel.value); });
 
       row.appendChild(label);
       row.appendChild(sel);
       box.appendChild(row);
     });
+    if (!config.categories.length) {
+      box.innerHTML = '<div class="empty">尚未配置标的池，请点击右上角「配置标的池」添加</div>';
+    }
   }
 
-  function onPoolChange(key, code) {
-    if (!code || state.selection[key] === code) return;
-    state.selection[key] = code;
+  function onPoolChange(catId, code) {
+    if (!code || state.selection[catId] === code) return;
+    state.selection[catId] = code;
+    resetSignalTracking();
     rebuildEtfs();
     state.lastKlineAt = 0;
+    buildPoolSelectors();
     buildChartPicker();
     computeAll();
     computeSignals();
@@ -871,11 +1230,12 @@
     if (el) el.textContent = ETFS.map(function (e) { return e.name + '(' + e.code + ')'; }).join(' · ');
   }
 
-  /* ================= 设置记忆 ================= */
+  /* ================= 设置记忆 / 信号存储 ================= */
 
   function loadPrefs() {
     try {
       var raw = localStorage.getItem(PREFS_KEY);
+      if (!raw) raw = localStorage.getItem(LEGACY_PREFS_KEY);
       return raw ? (JSON.parse(raw) || {}) : {};
     } catch (e) { return {}; }
   }
@@ -885,58 +1245,106 @@
       localStorage.setItem(PREFS_KEY, JSON.stringify({
         retDays: params.retDays,
         maDays: params.maDays,
+        leadGap: params.leadGap,
+        leadHold: params.leadHold,
         refreshSec: state.refreshSec,
         selection: state.selection,
-        notify: state.notify
+        config: config,
+        chartMode: chartMode,
+        notify: state.notify,
+        running: state.running
       }));
-    } catch (e) {}
-  }
-
-  function loadSignalHistory() {
-    try {
-      var arr = JSON.parse(localStorage.getItem(SIGNAL_HISTORY_KEY) || '[]');
-      if (!Array.isArray(arr)) return [];
-      var today = beijingDate(new Date());
-      return arr.filter(function (x) { return x && x.date === today; });
-    } catch (e) { return []; }
-  }
-
-  function saveSignalHistory(list) {
-    try {
-      localStorage.setItem(SIGNAL_HISTORY_KEY, JSON.stringify(list.slice(-20)));
-    } catch (e) {}
-  }
-
-  function loadSignalState() {
-    try {
-      return JSON.parse(localStorage.getItem(SIGNAL_STATE_KEY) || 'null');
-    } catch (e) { return null; }
-  }
-
-  function saveSignalState(s) {
-    try {
-      localStorage.setItem(SIGNAL_STATE_KEY, JSON.stringify(s));
     } catch (e) {}
   }
 
   function restorePrefs() {
     var p = loadPrefs();
-    if ([10, 20, 40].indexOf(p.retDays) >= 0) params.retDays = p.retDays;
-    if ([14, 28, 56].indexOf(p.maDays) >= 0) params.maDays = p.maDays;
+    if (p.config) config = normalizeConfig(p.config);
+
+    var r = parseInt(p.retDays, 10);
+    if (r >= 5 && r <= 240) params.retDays = r;
+    var m = parseInt(p.maDays, 10);
+    if (m >= 5 && m <= 240) params.maDays = m;
+    var g = parseFloat(p.leadGap);
+    if (g >= 0 && g <= 5) params.leadGap = g;
+    var h = parseInt(p.leadHold, 10);
+    if (h >= 0 && h <= 600) params.leadHold = h;
+
     if ([5, 10, 30, 60].indexOf(p.refreshSec) >= 0) {
       state.refreshSec = p.refreshSec;
       state.secLeft = p.refreshSec;
     }
     if (typeof p.notify === 'boolean') state.notify = p.notify;
+    if (typeof p.running === 'boolean') state.running = p.running;
+    if (p.chartMode === 'trend') chartMode = 'trend';
+
     if (p.selection) {
-      SLOTS.forEach(function (slot) {
-        var code = p.selection[slot.key];
+      config.categories.forEach(function (cat) {
+        var code = p.selection[cat.id];
         if (!code) return;
-        CATALOG[slot.key].forEach(function (item) {
-          if (item.code === code) state.selection[slot.key] = code;
+        cat.items.forEach(function (item) {
+          if (item.code === code) state.selection[cat.id] = code;
         });
       });
     }
+  }
+
+  function loadSigStore() {
+    try {
+      var o = JSON.parse(localStorage.getItem(SIGNAL_STATE_KEY) || 'null');
+      if (o && typeof o === 'object') {
+        return {
+          date: o.date || '',
+          last: o.last || null,
+          inited: !!o.inited,
+          count: typeof o.count === 'number' ? o.count : 0,
+          list: Array.isArray(o.list) ? o.list.slice(0, 3) : []
+        };
+      }
+    } catch (e) {}
+    return { date: '', last: null, inited: false, count: 0, list: [] };
+  }
+
+  function saveSigStore() {
+    try { localStorage.setItem(SIGNAL_STATE_KEY, JSON.stringify(state.sigStore)); } catch (e) {}
+  }
+
+  function readHoldHist() {
+    var today = beijingDate(new Date());
+    try {
+      var o = JSON.parse(localStorage.getItem(HOLD_KEY) || 'null');
+      if (o && typeof o === 'object' && o.days && typeof o.days === 'object') {
+        return { since: o.since || today, days: o.days };
+      }
+    } catch (e) {}
+    return { since: today, days: {} };
+  }
+
+  function saveHoldHist(h) {
+    try { localStorage.setItem(HOLD_KEY, JSON.stringify(h)); } catch (e) {}
+  }
+
+  function loadSignalHistoryAll() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(SIGNAL_HISTORY_KEY) || '[]');
+      if (!Array.isArray(arr)) return [];
+      return arr.filter(function (x) {
+        return x && x.ts && (x.type === 'buy' || x.type === 'sell' || x.type === 'switch');
+      }).slice(-HISTORY_MAX);
+    } catch (e) { return []; }
+  }
+
+  function saveSignalHistoryAll(list) {
+    try {
+      localStorage.setItem(SIGNAL_HISTORY_KEY, JSON.stringify(list.slice(-HISTORY_MAX)));
+    } catch (e) {}
+  }
+
+  function appendHistory(evt) {
+    evt.date = evt.date || beijingDate(new Date(evt.ts || Date.now()));
+    state.signalHistory.push(evt);
+    state.signalHistory = state.signalHistory.slice(-HISTORY_MAX);
+    saveSignalHistoryAll(state.signalHistory);
   }
 
   /* ================= 网络请求 ================= */
@@ -978,38 +1386,217 @@
     );
   }
 
+  function requestJson(url) {
+    var sep = url.indexOf('?') >= 0 ? '&' : '?';
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = setTimeout(function () { if (controller) controller.abort(); }, 8000);
+    return fetch(url + sep + '_=' + Date.now(), controller ? { signal: controller.signal } : undefined)
+      .then(function (res) {
+        if (!res.ok) throw new Error('http ' + res.status);
+        return res.text();
+      })
+      .then(function (text) { return JSON.parse(text); })
+      .then(function (data) { clearTimeout(timer); return data; },
+        function (err) { clearTimeout(timer); throw err; });
+  }
+
   /* ================= 行情与 K 线 ================= */
 
+  function tencentSym(etf) {
+    return (etf.secid.charAt(0) === '1' ? 'sh' : 'sz') + etf.code;
+  }
+
+  function parseTencentTime(s) {
+    if (!s || s.length < 14) return null;
+    var y = +s.slice(0, 4), m = +s.slice(4, 6) - 1, d = +s.slice(6, 8);
+    var hh = +s.slice(8, 10), mm = +s.slice(10, 12), ss = +s.slice(12, 14);
+    var t = Date.UTC(y, m, d, hh - 8, mm, ss);
+    return isFinite(t) ? Math.floor(t / 1000) : null;
+  }
+
+  // 腾讯行情补充：溢价率、IOPV、市值，并在东财缺失时补齐成交额 / 换手
+  function loadTencentQuotes() {
+    if (!ETFS.length) return Promise.resolve({});
+    var syms = ETFS.map(tencentSym);
+    var url = 'https://qt.gtimg.cn/q=' + syms.join(',') + '&r=' + Math.random();
+
+    return new Promise(function (resolve) {
+      var script = document.createElement('script');
+      var done = false;
+      var timer = setTimeout(function () { finish(); }, 7000);
+
+      function finish() {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (script.parentNode) script.parentNode.removeChild(script);
+        var out = {};
+        syms.forEach(function (sym) {
+          var raw = window['v_' + sym];
+          if (!raw) return;
+          var a = String(raw).split('~');
+          if (a.length < 40) return;
+          function f(i) {
+            var v = parseFloat(a[i]);
+            return isFinite(v) ? v : null;
+          }
+          out[a[2]] = {
+            price: f(3),
+            prevClose: f(4),
+            volume: f(6),
+            time: parseTencentTime(a[30] || ''),
+            amountWan: f(37),
+            turnover: f(38),
+            mvYi: f(45),
+            premium: f(77),
+            iopv: f(78)
+          };
+        });
+        resolve(out);
+      }
+
+      script.onload = finish;
+      script.onerror = finish;
+      script.src = url;
+      document.body.appendChild(script);
+    });
+  }
+
+  function applyTencentQuotes(tq) {
+    ETFS.forEach(function (etf) {
+      var t = tq[etf.code];
+      if (!t) return;
+      var q = state.quotes[etf.code];
+
+      // 东财完全不可用时，用腾讯行情兜底
+      if (!q && t.price != null) {
+        var prev = t.prevClose;
+        var chg = prev != null ? t.price - prev : null;
+        q = {
+          price: t.price,
+          dec: t.price < 10 ? 3 : 2,
+          change: chg,
+          pct: prev ? (t.price / prev - 1) * 100 : null,
+          amount: t.amountWan != null ? t.amountWan * 1e4 : null,
+          turnover: t.turnover,
+          mv: t.mvYi != null ? t.mvYi * 1e8 : null,
+          prevClose: prev,
+          time: t.time,
+          traded: t.price !== 0
+        };
+        state.quotes[etf.code] = q;
+      }
+      if (!q) return;
+
+      if (t.premium != null) q.premium = t.premium;
+      if (t.iopv != null) q.iopv = t.iopv;
+      if (t.mvYi != null) q.mv = t.mvYi * 1e8;
+      if (t.prevClose != null) q.prevClose = t.prevClose;
+      if (q.turnover == null && t.turnover != null) q.turnover = t.turnover;
+      if (q.amount == null && t.amountWan != null) q.amount = t.amountWan * 1e4;
+      if (t.price === 0 || (t.price == null && t.volume === 0)) q.traded = false;
+      if (q.time == null && t.time) q.time = t.time;
+    });
+  }
+
   function loadQuote(etf) {
-    var fields = 'f43,f57,f59,f169,f170,f48,f168,f86';
+    var fields = 'f43,f57,f59,f169,f170,f48,f168,f86,f116';
     var url = 'https://push2.eastmoney.com/api/qt/stock/get?secid=' + etf.secid + '&fields=' + fields + '&invt=2&fltt=1';
     return request(url).then(function (res) {
       var d = res && res.data;
       if (!d || d.f43 === '-' || d.f43 == null) throw new Error('empty quote');
       var dec = (d.f59 == null ? 3 : d.f59);
       var scale = Math.pow(10, dec);
+      var price = d.f43 / scale;
+      var change = d.f169 == null || d.f169 === '-' ? null : d.f169 / scale;
       return {
-        price: d.f43 / scale,
+        price: price,
         dec: dec,
-        change: d.f169 == null || d.f169 === '-' ? null : d.f169 / scale,
+        change: change,
         pct: d.f170 == null || d.f170 === '-' ? null : d.f170 / 100,
         amount: d.f48,
         turnover: d.f168 == null || d.f168 === '-' ? null : d.f168 / 100,
-        time: d.f86
+        mv: d.f116 == null || d.f116 === '-' ? null : d.f116,
+        prevClose: change == null ? null : price - change,
+        time: d.f86,
+        traded: true
       };
     });
   }
 
+  function parseEmKlines(klines) {
+    return klines.map(function (line) {
+      var a = line.split(',');
+      return { date: a[0], o: +a[1], c: +a[2], h: +a[3], l: +a[4], v: +a[5], amt: +a[6] };
+    });
+  }
+
+  function parseTencentKlines(rows) {
+    return rows.map(function (r) {
+      return { date: r[0], o: +r[1], c: +r[2], h: +r[3], l: +r[4], v: +r[5], amt: null };
+    }).filter(function (b) {
+      return b.date && isFinite(b.c) && b.c > 0;
+    });
+  }
+
   function loadKline(etf) {
+    var count = Math.min(400, Math.max(180, Math.max(params.maDays, params.retDays) + 80));
     var url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + etf.secid +
-      '&klt=101&fqt=1&lmt=160&end=20500101&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57';
+      '&klt=101&fqt=1&lmt=' + count + '&end=20500101&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57';
     return request(url).then(function (res) {
       var d = res && res.data;
       if (!d || !d.klines || !d.klines.length) throw new Error('empty kline');
-      return d.klines.map(function (line) {
+      return parseEmKlines(d.klines);
+    }).catch(function () {
+      var sym = tencentSym(etf);
+      var q = ',day,,,' + count + ',qfq';
+      return requestJson('https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=' + sym + q)
+        .catch(function () {
+          return requestJson('https://proxy.finance.qq.com/ifzqgtimg/appstock/app/fqkline/get?param=' + sym + q);
+        })
+        .then(function (res) {
+          var node = res && res.data && res.data[sym];
+          var rows = node && (node.qfqday || node.day);
+          if (!rows || !rows.length) throw new Error('empty kline');
+          return parseTencentKlines(rows);
+        });
+    });
+  }
+
+  function slotOfTime(s) {
+    var m = /(\d{2}):(\d{2})/.exec(String(s).slice(11));
+    if (!m) return null;
+    var mins = (+m[1]) * 60 + (+m[2]);
+    if (mins < 570 || mins > 900) return null;
+    if (mins <= 690) return mins - 570;
+    if (mins < 780) return null;
+    return 120 + Math.min(119, mins - 780);
+  }
+
+  function loadTrend(etf) {
+    var url = 'https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=' + etf.secid +
+      '&fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58&ndays=2&iscr=0';
+    return request(url).then(function (res) {
+      var d = res && res.data;
+      if (!d || !Array.isArray(d.trends) || !d.trends.length) throw new Error('empty trend');
+      var rows = d.trends.map(function (line) {
         var a = line.split(',');
-        return { date: a[0], o: +a[1], c: +a[2], h: +a[3], l: +a[4], v: +a[5], amt: +a[6] };
+        return {
+          time: a[0], slot: slotOfTime(a[0]), price: +a[2],
+          hi: +a[3], lo: +a[4], vol: +a[5], amt: +a[6], avg: a[7] === '' ? null : +a[7]
+        };
+      }).filter(function (p) {
+        return p.slot != null && isFinite(p.price);
       });
+      var day = rows.length ? rows[rows.length - 1].time.slice(0, 10) : '';
+      rows = rows.filter(function (p) { return p.time.slice(0, 10) === day; });
+      var pre = parseFloat(d.preClose);
+      if (!isFinite(pre)) pre = parseFloat(d.prePrice);
+      if (!isFinite(pre)) {
+        var q = state.quotes[etf.code];
+        pre = q && q.prevClose != null ? q.prevClose : null;
+      }
+      return { points: rows, preClose: pre, dec: state.quotes[etf.code] && state.quotes[etf.code].dec != null ? state.quotes[etf.code].dec : 3 };
     });
   }
 
@@ -1105,10 +1692,44 @@
     });
 
     var dates = Object.keys(dateSet).sort();
+    state.streak = {};
     state.prevDate = null;
+    state.prevHeld = null;
     state.heldCode = null;
     state.sellCode = null;
+    state.heldIntraday = false;
+    state.heldTime = '';
+    state.heldCount = 0;
     if (dates.length < 2) return;
+
+    // 日K逐日回放（含 leadGap 防抖的日线近似）：仅用于补录整天未打开看板的缺失日
+    var replayHeld = {};
+    var replayPos = '';
+    dates.forEach(function (d) {
+      var rs = [];
+      ETFS.forEach(function (etf) {
+        var v = series[etf.code][d];
+        if (v && v.ma28 != null && v.ret20 != null) {
+          rs.push({ code: etf.code, ret: v.ret20, above: v.close > v.ma28 });
+        }
+      });
+      if (rs.length !== ETFS.length) { replayHeld[d] = null; return; }
+      rs.sort(function (a, b) { return b.ret - a.ret; });
+      var top = rs[0].above ? rs[0] : null;
+      if (replayPos) {
+        var hv = series[replayPos] ? series[replayPos][d] : null;
+        if (hv && hv.ma28 != null && hv.ret20 != null && hv.close > hv.ma28) {
+          if (top && top.code !== replayPos && top.ret - hv.ret20 >= params.leadGap) {
+            replayPos = top.code;
+          }
+        } else {
+          replayPos = top ? top.code : '';
+        }
+      } else {
+        replayPos = top ? top.code : '';
+      }
+      replayHeld[d] = replayPos;
+    });
 
     var prev = dates[dates.length - 2];
     state.prevDate = prev;
@@ -1119,7 +1740,8 @@
       if (v && v.ret20 != null) rows.push({ code: etf.code, ret20: v.ret20 });
     });
     var prevRanks = {};
-    if (rows.length === ETFS.length) {
+    var prevReady = rows.length === ETFS.length;
+    if (prevReady) {
       rows.sort(function (a, b) { return b.ret20 - a.ret20; });
       rows.forEach(function (r, i) { prevRanks[r.code] = i + 1; });
     }
@@ -1127,14 +1749,100 @@
     ETFS.forEach(function (etf) {
       var v = series[etf.code][prev];
       if (!v || v.ma28 == null) return;
-      if (prevRanks[etf.code] === 1 && v.close > v.ma28) state.heldCode = etf.code;
+      if (prevRanks[etf.code] === 1 && v.close > v.ma28) {
+        state.heldCode = etf.code;
+        state.prevHeld = etf.code;
+      }
     });
 
-    if (state.heldCode) {
+    // 今日已出现信号变化时，持仓基准推进到最近一次信号的目标
+    var todayStr = beijingDate(new Date());
+    var evts = [];
+    if (state.sigStore && state.sigStore.date === todayStr && state.sigStore.inited) {
+      evts = (state.sigStore.list || []).slice().sort(function (a, b) {
+        return a.t < b.t ? -1 : (a.t > b.t ? 1 : 0);
+      });
+    }
+    state.heldIntraday = evts.length > 0;
+    state.heldCount = evts.length ? Math.max(state.sigStore.count || 0, evts.length) : 0;
+    state.heldTime = evts.length ? evts[evts.length - 1].t : '';
+    if (state.heldIntraday) state.heldCode = state.sigStore.last || null;
+
+    // 今日该标的触发卖出条件之一 → 卖出信号
+    // 若原始条件刚变化、仍在防抖确认期，则先保持原持仓，不提前切换展示
+    if (state.heldCode && !state.sigPend) {
       var r = state.rank[state.heldCode];
       var m = state.metrics[state.heldCode];
       if (m && r && (r !== 1 || !m.above)) state.sellCode = state.heldCode;
     }
+
+    updateHoldStreak(dates, replayHeld, prevReady);
+  }
+
+  // 已连续持仓天数：按每日「实际显示」的持仓快照统计
+  function updateHoldStreak(dates, replay, ready) {
+    var now = new Date();
+    var today = beijingDate(now);
+    var wd = now.getDay();
+
+    var hasTodayBar = dates.indexOf(today) >= 0;
+    var quoteToday = false;
+    Object.keys(state.quotes).some(function (c) {
+      var qt = state.quotes[c] && state.quotes[c].time;
+      if (qt && beijingDate(new Date(qt * 1000)) === today) { quoteToday = true; return true; }
+      return false;
+    });
+    var isTradeDay = wd !== 0 && wd !== 6 &&
+      (hasTodayBar || quoteToday || marketState() !== 'closed');
+
+    var code = '';
+    if (!state.sellCode) {
+      if (state.heldIntraday) code = state.sigStore.last || '';
+      else code = state.prevHeld || '';
+    }
+
+    var hist = readHoldHist();
+    var days = hist.days;
+    var changed = false;
+
+    if (replay) {
+      dates.forEach(function (d) {
+        if (d <= hist.since || d >= today) return;
+        if (days[d] !== undefined || replay[d] == null) return;
+        days[d] = replay[d];
+        changed = true;
+      });
+    }
+
+    if (ready && isTradeDay && days[today] !== code) {
+      days[today] = code;
+      changed = true;
+    }
+    if (changed) {
+      var keys = Object.keys(days).sort();
+      while (keys.length > 400) { delete days[keys.shift()]; }
+      saveHoldHist(hist);
+    }
+
+    var n = 0;
+    if (code) {
+      var seq = dates.filter(function (d) { return d <= today; });
+      if (isTradeDay && seq[seq.length - 1] !== today && (ready || days[today] !== undefined)) {
+        seq.push(today);
+      }
+      for (var i = seq.length - 1; i >= 0; i--) {
+        var key = seq[i];
+        var v = days[key];
+        // 持仓基准由上一交易日收盘决定，晚于基准日的交易日仍持有同一标的
+        if (v === undefined && state.prevDate && key >= state.prevDate) {
+          v = state.prevHeld || '';
+        }
+        if (v !== code) break;
+        n++;
+      }
+    }
+    state.streak = {};
+    if (code) state.streak[code] = n;
   }
 
   function sellReason(code) {
@@ -1146,14 +1854,61 @@
     return rs.join('、');
   }
 
+  function heldBasisText() {
+    if (state.heldIntraday) return '今日 ' + (state.heldTime || '') + ' 信号后的持仓';
+    if (state.prevDate) return '上一交易日（' + state.prevDate.slice(5) + '）的持仓';
+    return '上一交易日的持仓';
+  }
+
+  function pendText() {
+    var p = state.sigPend;
+    if (!p) return '';
+    if (!p.code) {
+      return '原持仓即将跌破均线，等待 ' + params.leadHold + ' 秒确认卖出';
+    }
+    if (p.gapOk) {
+      var elapsed = p.since ? Math.min(params.leadHold, Math.round((Date.now() - p.since) / 1000)) : 0;
+      return '换仓候选 ' + nameOf(p.code) + ' 持续确认中 ' + elapsed + '/' + params.leadHold + ' 秒';
+    }
+    return '换仓候选 ' + nameOf(p.code) + ' 仅领先 ' +
+      (p.gap == null ? '—' : p.gap.toFixed(2)) + ' 个百分点，未达阈值 ' +
+      params.leadGap.toFixed(1) + '，暂不切换';
+  }
+
+  function streakText(code) {
+    var n = state.streak[code];
+    return n ? '已连续持仓 ' + n + ' 个交易日' : '';
+  }
+
   function adviceOf(code) {
     var m = state.metrics[code];
     var rank = state.rank[code];
     if (!m || !rank) return { text: '—', cls: 'hold', desc: '数据不足' };
+
+    // 防抖确认期：候选标的与原持仓保持原状态，避免建议来回跳动
+    var p = state.sigPend;
+    if (p) {
+      if (p.code === code) {
+        return {
+          text: '候选', cls: 'wait',
+          desc: p.gapOk
+            ? (p.gap == null ? '' : '领先 ' + p.gap.toFixed(2) + ' 个百分点，') +
+              '持续确认中（需 ' + params.leadHold + ' 秒）'
+            : '领先 ' + (p.gap == null ? '—' : p.gap.toFixed(2)) + ' 个百分点，未达 ' +
+              params.leadGap.toFixed(1) + '，暂不换仓'
+        };
+      }
+      if (p.from === code) {
+        return p.code
+          ? { text: '买入/持仓', cls: 'buy', desc: '确认换仓到 ' + nameOf(p.code) + ' 前继续持有' }
+          : { text: '待确认卖出', cls: 'wait', desc: pendText() };
+      }
+    }
+
     if (state.sellCode === code) {
       return {
         text: '卖出', cls: 'sell',
-        desc: '上一交易日为买入/持仓标的，今日' + sellReason(code) + '，按规则卖出'
+        desc: heldBasisText() + '，今日' + sellReason(code) + '，按规则卖出'
       };
     }
     if (rank === 1 && m.above) {
@@ -1164,70 +1919,144 @@
     return { text: '回避', cls: 'avoid', desc: '非第1名 且 跌破' + params.maDays + '日线' };
   }
 
-  // 记录“买入/持仓”状态的变化，生成当日信号流水
-  function recordSignalChange() {
-    if (!ETFS.length) return;
-    for (var i = 0; i < ETFS.length; i++) {
-      if (!state.metrics[ETFS[i].code] || !state.rank[ETFS[i].code]) return;
-    }
+  /* ================= 信号防抖与记录 ================= */
 
-    var buy = null;
+  // 参数或标的池变化时，静默重设基准，避免把配置变更记成买卖信号
+  function resetSignalTracking() {
+    state.sigStore.last = null;
+    state.sigStore.inited = false;
+    state.sigStore.list = [];
+    state.sigStore.count = 0;
+    state.sigPend = null;
+    state.sigSuppress = true;
+    saveSigStore();
+  }
+
+  // 当前策略级信号：排名第一 且 站上均线 的那只 ETF
+  function currentBuyCode() {
+    if (Object.keys(state.metrics).length !== ETFS.length) return null;
+    var code = null;
     ETFS.forEach(function (etf) {
-      if (adviceOf(etf.code).cls === 'buy') buy = etf;
+      var m = state.metrics[etf.code];
+      if (state.rank[etf.code] === 1 && m && m.above) code = etf.code;
     });
-    var cur = {
-      holdCode: buy ? buy.code : null,
-      holdName: buy ? buy.name : null,
-      sellCode: state.sellCode || null,
-      sellName: state.sellCode ? nameOf(state.sellCode) : null
-    };
+    return code;
+  }
+
+  function leadGapOf(cand, held) {
+    if (!cand || !held) return null;
+    var a = state.metrics[cand];
+    var b = state.metrics[held];
+    if (!a || !b || a.ret20 == null || b.ret20 == null) return null;
+    return a.ret20 - b.ret20;
+  }
+
+  // 信号防抖：领先幅度达标 + 领先状态持续够久，才记录一次信号变化
+  function trackSignal() {
+    if (Object.keys(state.metrics).length !== ETFS.length) return null;
+    var store = state.sigStore;
     var today = beijingDate(new Date());
-    var prev = loadSignalState();
-    var action = { sellCode: null, sellName: null, buyCode: null, buyName: null };
+    var prevStoreDate = store.date;
+    if (store.date !== today) {
+      store.date = today;
+      store.list = [];
+      store.count = 0;
+    }
 
-    // 首次运行只建立基线，不把“当前状态”误记成一次变化
-    if (prev) {
-      if (prev.holdCode && prev.holdCode !== cur.holdCode) {
-        action.sellCode = prev.holdCode;
-        action.sellName = prev.holdName || nameOf(prev.holdCode);
-      } else if (cur.sellCode && cur.sellCode !== prev.sellCode) {
-        action.sellCode = cur.sellCode;
-        action.sellName = cur.sellName;
+    var cur = currentBuyCode();
+    var carried = false;
+    if (!store.inited) {
+      store.inited = true;
+      state.sigPend = null;
+      if (state.sigSuppress || !prevStoreDate) {
+        state.sigSuppress = false;
+        store.last = cur;
+        saveSigStore();
+        return null;
       }
-      if (cur.holdCode && cur.holdCode !== prev.holdCode) {
-        action.buyCode = cur.holdCode;
-        action.buyName = cur.holdName;
+      carried = true;
+      saveSigStore();
+    }
+    if (cur === store.last) {
+      state.sigPend = null;
+      return null;
+    }
+
+    var held = store.last;
+    var heldBelow = !!(held && state.metrics[held] && !state.metrics[held].above);
+    var needGap = !!(held && cur && !heldBelow);
+    var gap = needGap ? leadGapOf(cur, held) : null;
+    var gapOk = !needGap || gap == null || gap >= params.leadGap;
+    var holdMs = params.leadHold * 1000;
+    var now = Date.now();
+    var p = state.sigPend;
+    var same = !!(p && p.code === cur && p.from === held);
+
+    if (!gapOk) {
+      state.sigPend = { code: cur, from: held, since: 0, gap: gap, gapOk: false };
+      return null;
+    }
+
+    // 只有“原持仓仍在均线上方、新第一名想接管”的换仓才需要持续确认；
+    // 跌破均线卖出、空仓后首次买入立即生效。
+    var needWait = needGap && holdMs > 0;
+    if (needWait && !carried) {
+      if (!same || !p.gapOk) {
+        state.sigPend = { code: cur, from: held, since: now, gap: gap, gapOk: true };
+        return null;
       }
+      p.gap = gap;
+      if (now - p.since < holdMs) return null;
     }
 
-    if (action.sellCode && action.sellCode === action.buyCode) {
-      action.sellCode = null;
-      action.sellName = null;
+    var pendSecs = (needWait && state.sigPend && state.sigPend.since && !carried)
+      ? Math.max(0, Math.round((now - state.sigPend.since) / 1000))
+      : null;
+    state.sigPend = null;
+
+    var t = fmtHM(now);
+    var evt;
+    if (held && cur) {
+      evt = { t: t, ts: now, date: today, type: 'switch', from: held, to: cur, gap: gap, holdSecs: pendSecs };
+    } else if (held) {
+      evt = { t: t, ts: now, date: today, type: 'sell', from: held, holdSecs: pendSecs };
+    } else {
+      evt = { t: t, ts: now, date: today, type: 'buy', to: cur, holdSecs: pendSecs };
     }
+    store.list.unshift(evt);
+    store.list.sort(function (a, b) { return a.t < b.t ? 1 : (a.t > b.t ? -1 : 0); });
+    store.list = store.list.slice(0, 3);
+    store.count = (store.count || 0) + 1;
+    store.last = cur;
+    saveSigStore();
+    appendHistory(evt);
+    return evt;
+  }
 
-    if (action.sellCode || action.buyCode) {
-      state.signalHistory = state.signalHistory.filter(function (x) { return x.date === today; });
-      state.signalHistory.push({
-        date: today,
-        ts: Date.now(),
-        sellCode: action.sellCode,
-        sellName: action.sellName,
-        buyCode: action.buyCode,
-        buyName: action.buyName
-      });
-      state.signalHistory = state.signalHistory.slice(-20);
-      saveSignalHistory(state.signalHistory);
-    }
-
-    saveSignalState({
-      date: today,
-      holdCode: cur.holdCode,
-      holdName: cur.holdName,
-      sellCode: cur.sellCode,
-      sellName: cur.sellName
-    });
-
-    if (action.sellCode || action.buyCode) notifySignalChange(action);
+  // 历史信号事件 → 详情（兼容旧格式仅含 sellCode/buyCode）
+  function eventDetail(evt) {
+    if (!evt) return null;
+    var type = evt.type;
+    var sellCode = evt.from || evt.sellCode || null;
+    var buyCode = evt.to || evt.buyCode || null;
+    if (!type) type = sellCode && buyCode ? 'switch' : (buyCode ? 'buy' : 'sell');
+    var sell = sellCode ? codeInfo(sellCode) : null;
+    var buy = buyCode ? codeInfo(buyCode) : null;
+    if (!sell && !buy) return null;
+    var badge = type === 'switch' ? '换仓信号' : (type === 'buy' ? '买入信号' : '卖出信号');
+    var title = type === 'switch'
+      ? '卖出 ' + sell.name + ' → 买入 ' + buy.name
+      : (type === 'buy' ? '买入 ' + buy.name : '卖出 ' + sell.name);
+    return {
+      type: type,
+      badge: badge,
+      title: title,
+      time: evt.t || (evt.ts ? fmtHM(evt.ts) : '—'),
+      sell: sell,
+      buy: buy,
+      gap: evt.gap,
+      holdSecs: evt.holdSecs
+    };
   }
 
   function codeInfo(code) {
@@ -1264,25 +2093,6 @@
       '</div>';
   }
 
-  function buildSignalDetail(action) {
-    var sell = action.sellCode ? codeInfo(action.sellCode) : null;
-    var buy = action.buyCode ? codeInfo(action.buyCode) : null;
-    if (!sell && !buy) return null;
-    var type = sell && buy ? 'rotate' : (buy ? 'buy' : 'sell');
-    var badge = type === 'rotate' ? '换仓信号' : (type === 'buy' ? '买入信号' : '卖出信号');
-    var title = type === 'rotate'
-      ? '卖出 ' + sell.name + ' → 买入 ' + buy.name
-      : (type === 'buy' ? '买入 ' + buy.name : '卖出 ' + sell.name);
-    return {
-      type: type,
-      badge: badge,
-      title: title,
-      time: fmtHM(Date.now()),
-      sell: sell,
-      buy: buy
-    };
-  }
-
   function openSignalModal(detail) {
     if (!detail) return;
     $('smBadge').className = 'sm-badge ' + detail.type;
@@ -1309,7 +2119,7 @@
 
   function sendSystemNotification(detail) {
     if (!notificationSupported() || Notification.permission !== 'granted') return;
-    var body = detail.type === 'rotate'
+    var body = (detail.type === 'rotate' || detail.type === 'switch')
       ? '卖出 ' + detail.sell.name + '，买入 ' + detail.buy.name
       : (detail.type === 'buy' ? '买入 ' + detail.buy.name : '卖出 ' + detail.sell.name);
     var options = {
@@ -1359,9 +2169,9 @@
     }
   }
 
-  function notifySignalChange(action) {
+  function notifySignalChange(evt) {
     if (!state.notify) return;
-    var detail = buildSignalDetail(action);
+    var detail = eventDetail(evt);
     if (!detail) return;
     openSignalModal(detail);
     sendSystemNotification(detail);
@@ -1443,6 +2253,12 @@
     var rank = state.rank[code];
     if (!m || !rank) return '数据不足';
     if (adv.cls === 'sell') return '触发卖出条件';
+    var p = state.sigPend;
+    if (p && p.code === code) {
+      return p.gapOk
+        ? '候选确认中 · 领先 ' + (p.gap == null ? '—' : p.gap.toFixed(2)) + '%'
+        : '候选不足 · 领先 ' + (p.gap == null ? '—' : p.gap.toFixed(2)) + '%';
+    }
     var pos = m.above ? '站上' : '跌破';
     return '排名第' + rank + ' · ' + pos + params.maDays + '日线';
   }
@@ -1453,53 +2269,57 @@
 
   function renderHero() {
     var box = $('heroCard');
-    var target = null;
-    ETFS.forEach(function (etf) {
-      if (adviceOf(etf.code).cls === 'buy') target = etf;
-    });
+    var target = state.heldCode ? byCode(state.heldCode) : null;
 
-    if (state.sellCode) {
+    if (!state.heldCode && state.sigPend && state.sigPend.code && state.sigPend.gapOk) {
+      box.className = 'hero cash';
+      $('signalValue').innerHTML = '信号确认中 <span class="up">' + esc(nameOf(state.sigPend.code)) + '</span>';
+      $('signalSub').textContent = pendText();
+    } else if (state.sellCode) {
       box.className = 'hero sell';
       $('signalValue').innerHTML = '卖出 <span class="down">' + esc(nameOf(state.sellCode)) + '</span>';
-      $('signalSub').textContent = '上一交易日（' + (state.prevDate || '').slice(5) + '）的持仓标的，今日' + sellReason(state.sellCode);
+      $('signalSub').textContent = heldBasisText() + '，今日' + sellReason(state.sellCode);
     } else if (target) {
       box.className = 'hero buy';
+      var st = streakText(target.code);
       $('signalValue').innerHTML = '买入/持仓 <span class="up">' + esc(target.name) + '</span>';
-      $('signalSub').textContent = params.retDays + '日排名第1 且 站上' + params.maDays + '日线 · 已持有则继续持有';
+      $('signalSub').textContent = params.retDays + '日排名第1 且 站上' + params.maDays + '日线' +
+        (st ? ' · ' + st : '') + (state.sigPend ? ' · ' + pendText() : '');
     } else if (state.leader) {
       var lm = state.metrics[state.leader];
       box.className = 'hero cash';
       $('signalValue').textContent = '空仓等待';
-      $('signalSub').textContent = lm && !lm.above
+      $('signalSub').textContent = (lm && !lm.above
         ? '第一名 ' + nameOf(state.leader) + ' 未站上' + params.maDays + '日线，无一标的满足买入/持仓条件'
-        : '暂无标的同时满足两条件';
+        : '暂无标的同时满足两条件') + (state.sigPend ? ' · ' + pendText() : '');
     } else {
       box.className = 'hero';
       $('signalValue').textContent = '—';
       $('signalSub').textContent = '等待行情数据…';
     }
 
-    $('heroParam').textContent = params.retDays + '日涨幅 · MA' + params.maDays;
+    $('heroParam').textContent = params.retDays + '日 · MA' + params.maDays +
+      ' · 防抖 ' + params.leadGap.toFixed(1) + '%/' + params.leadHold + 's';
     $('heroTime').textContent = state.dataTime ? '数据 ' + fmtClock(state.dataTime) : '等待行情';
   }
 
   function renderSignalChange() {
     var today = beijingDate(new Date());
     var list = (state.signalHistory || []).filter(function (x) {
-      return x.date === today;
+      return (x.date || beijingDate(new Date(x.ts))) === today;
     }).sort(function (a, b) {
       return b.ts - a.ts;
     }).slice(0, 3);
     var html = '';
     list.forEach(function (item) {
-      html += '<div class="sc-row"><span class="t">' + fmtHM(item.ts) + '</span>';
-      if (item.sellCode) {
-        html += '<span class="act sell">卖出</span><span class="nm">' +
-          esc(item.sellName || nameOf(item.sellCode)) + '</span>';
+      var d = eventDetail(item);
+      if (!d) return;
+      html += '<div class="sc-row"><span class="t">' + esc(d.time) + '</span>';
+      if (d.sell) {
+        html += '<span class="act sell">卖出</span><span class="nm">' + esc(d.sell.name) + '</span>';
       }
-      if (item.buyCode) {
-        html += '<span class="act buy">买入</span><span class="nm">' +
-          esc(item.buyName || nameOf(item.buyCode)) + '</span>';
+      if (d.buy) {
+        html += '<span class="act buy">买入</span><span class="nm">' + esc(d.buy.name) + '</span>';
       }
       html += '</div>';
     });
@@ -1512,7 +2332,7 @@
   function renderSignalList() {
     var el = $('signalList');
     if (!Object.keys(state.metrics).length) {
-      el.innerHTML = '<div class="empty">行情加载中…<br>若长时间无数据，请检查网络后点击右上角刷新</div>';
+      el.innerHTML = '<div class="empty">行情加载中…<br>若长时间无数据，请检查网络后点按右上角启停按钮重试</div>';
       return;
     }
 
@@ -1528,15 +2348,16 @@
       html += '<div class="card-top">';
       html += '<span class="rank-badge' + (rank === 1 ? ' r1' : '') + '">' + (rank || '—') + '</span>';
       html += '<div class="etf-id"><span class="etf-name">' + esc(etf.name) + '</span>' +
-        '<span class="etf-meta">' + etf.code + ' · ' + esc(etf.role) + '</span></div>';
+        '<span class="etf-meta">' + etf.code + ' · ' + esc(etf.role) + t0Html(etf.code) + '</span></div>';
       html += '<span class="badge ' + adv.cls + '">' + adv.text + '</span>';
       html += '</div>';
 
       html += '<div class="card-body">';
       if (q) {
+        var traded = q.traded !== false && q.price != null;
         html += '<div class="card-price">' +
-          '<span class="px num ' + signCls(q.change) + '">' + q.price.toFixed(q.dec) + '</span>' +
-          '<span class="pct num ' + signCls(q.pct) + '">' + signTxt(q.pct, 2, '%') + '</span>' +
+          '<span class="px num ' + (traded ? signCls(q.change) : 'flat') + '">' + (traded ? q.price.toFixed(q.dec) : '—') + '</span>' +
+          '<span class="pct num ' + (traded ? signCls(q.pct) : 'flat') + '">' + (traded ? signTxt(q.pct, 2, '%') : '暂无成交') + '</span>' +
           '</div>';
       } else {
         html += '<div class="card-price"><span class="px num">—</span></div>';
@@ -1548,7 +2369,8 @@
       html += metricHtml(params.retDays + '日涨幅', m ? signTxt(m.ret20, 2, '%') : '—', m ? signCls(m.ret20) : 'flat');
       html += metricHtml(params.maDays + '日均线', m ? m.ma28.toFixed(3) : '—', '');
       html += metricHtml('距均线', m ? signTxt(m.diffPct, 2, '%') : '—', m ? signCls(m.diffPct) : 'flat');
-      html += metricHtml('成交额', q ? fmtAmount(q.amount) : '—', '');
+      html += metricHtml('溢价率', q && q.premium != null ? signTxt(q.premium, 2, '%') : '—',
+        q && q.premium != null ? signCls(q.premium) : 'flat');
       html += '</div>';
       html += '</button>';
     });
@@ -1583,6 +2405,12 @@
       if (displaySort === 'ret20') {
         return (mb && mb.ret20 != null ? mb.ret20 : -999) - (ma && ma.ret20 != null ? ma.ret20 : -999);
       }
+      if (displaySort === 'premium') {
+        return (qb && qb.premium != null ? qb.premium : -999) - (qa && qa.premium != null ? qa.premium : -999);
+      }
+      if (displaySort === 'amount') {
+        return (qb && qb.amount != null ? qb.amount : -999) - (qa && qa.amount != null ? qa.amount : -999);
+      }
       return 0;
     });
     return arr;
@@ -1591,7 +2419,7 @@
   function renderQuoteList() {
     var el = $('quoteList');
     if (!Object.keys(state.metrics).length) {
-      el.innerHTML = '<div class="empty">行情加载中…<br>若长时间无数据，请检查网络后点击右上角刷新</div>';
+      el.innerHTML = '<div class="empty">行情加载中…<br>若长时间无数据，请检查网络后点按右上角启停按钮重试</div>';
       return;
     }
 
@@ -1605,10 +2433,13 @@
       html += '<div class="q-head">';
       html += '<span class="rank-badge' + (rank === 1 ? ' r1' : '') + '">' + (rank || '—') + '</span>';
       html += '<div class="etf-id"><span class="etf-name">' + esc(etf.name) + '</span>' +
-        '<span class="etf-meta">' + etf.code + ' · ' + esc(etf.role) + '</span></div>';
+        '<span class="etf-meta">' + etf.code + ' · ' + esc(etf.role) + t0Html(etf.code) + '</span></div>';
       if (q) {
-        html += '<div class="q-price"><b class="num ' + signCls(q.change) + '">' + q.price.toFixed(q.dec) + '</b>' +
-          '<span class="num ' + signCls(q.pct) + '">' + signTxt(q.pct, 2, '%') + '</span></div>';
+        var traded = q.traded !== false && q.price != null;
+        html += '<div class="q-price"><b class="num ' + (traded ? signCls(q.change) : 'flat') + '">' +
+          (traded ? q.price.toFixed(q.dec) : '—') + '</b>' +
+          '<span class="num ' + (traded ? signCls(q.pct) : 'flat') + '">' +
+          (traded ? signTxt(q.pct, 2, '%') : '暂无成交') + '</span></div>';
       } else {
         html += '<div class="q-price"><b class="num">—</b><span>—</span></div>';
       }
@@ -1617,10 +2448,11 @@
       html += '<div class="q-grid">';
       html += qItemHtml('成交额', q ? fmtAmount(q.amount) : '—', '');
       html += qItemHtml('换手率', q && q.turnover != null ? q.turnover.toFixed(2) + '%' : '—', '');
+      html += qItemHtml('溢价率', q && q.premium != null ? signTxt(q.premium, 2, '%') : '—',
+        q && q.premium != null ? signCls(q.premium) : 'flat');
       html += qItemHtml(params.retDays + '日涨幅', m ? signTxt(m.ret20, 2, '%') : '—', m ? signCls(m.ret20) : 'flat');
       html += qItemHtml(params.retDays + '日排名', rank || '—', '');
       html += qItemHtml(params.maDays + '日均线', m ? m.ma28.toFixed(3) : '—', '');
-      html += qItemHtml('距均线', m ? signTxt(m.diffPct, 2, '%') : '—', m ? signCls(m.diffPct) : 'flat');
       html += '</div>';
       html += '</button>';
     });
@@ -1666,7 +2498,50 @@
     }
 
     renderChartMeta();
+    if (chartMode === 'trend') ensureTrend(true);
+    else drawChart();
+  }
+
+  function setChartMode(mode) {
+    chartMode = mode === 'trend' ? 'trend' : 'kline';
+    syncChartModeUI();
+    chartHover = -1;
+    trendHover = -1;
+    $('chartTip').style.display = 'none';
+    savePrefs();
+    if (chartMode === 'trend') ensureTrend();
+    else drawChart();
+  }
+
+  function ensureTrend(force) {
+    var etf = byCode(activeChart);
+    if (!etf) return;
+    var fresh = trendState.code === etf.code && trendState.points.length &&
+      Date.now() - trendState.fetchedAt < 60000;
+    if (!force && fresh) { drawChart(); return; }
+
+    trendState = {
+      code: etf.code, loading: true, error: false, points: [], preClose: null,
+      dec: state.quotes[etf.code] && state.quotes[etf.code].dec != null ? state.quotes[etf.code].dec : 3,
+      fetchedAt: 0
+    };
     drawChart();
+
+    loadTrend(etf).then(function (res) {
+      if (trendState.code !== etf.code) return;
+      trendState.loading = false;
+      trendState.error = false;
+      trendState.points = res.points || [];
+      trendState.preClose = res.preClose;
+      trendState.dec = res.dec;
+      trendState.fetchedAt = Date.now();
+      drawChart();
+    }).catch(function () {
+      if (trendState.code !== etf.code) return;
+      trendState.loading = false;
+      trendState.error = true;
+      drawChart();
+    });
   }
 
   function renderChartMeta() {
@@ -1720,6 +2595,7 @@
   }
 
   function drawChart() {
+    if (chartMode === 'trend') { drawTrend(); return; }
     var etf = byCode(activeChart);
     if (!etf) return;
     var canvas = $('klineCanvas');
@@ -1882,6 +2758,235 @@
     };
   }
 
+  /* ---------- 分时图 ---------- */
+
+  function drawTrend() {
+    var etf = byCode(activeChart);
+    var canvas = $('klineCanvas');
+    var box = $('chartBox');
+    if (!etf || !canvas || !box) return;
+
+    var W = box.clientWidth;
+    var H = box.clientHeight;
+    if (!W || !H) return;
+
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+    }
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    function msg(text) {
+      trendGeo = null;
+      ctx.fillStyle = '#6c7789';
+      ctx.font = '12px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, W / 2, H / 2);
+    }
+
+    var st = trendState;
+    if (st.code !== etf.code || st.loading) { msg('分时数据加载中…'); return; }
+    if (st.error || !st.points.length) { msg('暂无分时数据'); return; }
+
+    var pts = st.points;
+    var pre = st.preClose;
+    var hi = -Infinity;
+    var lo = Infinity;
+    pts.forEach(function (p) {
+      if (p.price > hi) hi = p.price;
+      if (p.price < lo) lo = p.price;
+      if (p.avg != null) {
+        if (p.avg > hi) hi = p.avg;
+        if (p.avg < lo) lo = p.avg;
+      }
+    });
+    if (pre != null && isFinite(pre)) {
+      hi = Math.max(hi, pre);
+      lo = Math.min(lo, pre);
+    }
+    if (!isFinite(hi) || !isFinite(lo)) { msg('分时数据异常'); return; }
+    var pad = (hi - lo) * 0.1 || Math.max(0.001, hi * 0.002);
+    hi += pad;
+    lo -= pad;
+
+    var padL = 6;
+    var padR = 50;
+    var padT = 8;
+    var padB = 18;
+    var plotW = W - padL - padR;
+    var totalH = H - padT - padB;
+    var volH = Math.max(16, totalH * 0.15);
+    var gapH = 7;
+    var priceH = totalH - volH - gapH;
+    var volTop = padT + priceH + gapH;
+    var slotW = plotW / 240;
+
+    function yAt(p) { return padT + (hi - p) / (hi - lo) * priceH; }
+    function xSlot(s) { return padL + (s + 0.5) * slotW; }
+
+    var volMax = 0;
+    pts.forEach(function (p) { if (isFinite(p.vol) && p.vol > volMax) volMax = p.vol; });
+
+    // 网格与价格刻度
+    ctx.font = '10px "SF Mono", Consolas, monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    for (var g = 0; g <= 4; g++) {
+      var gp = lo + (hi - lo) * g / 4;
+      var gy = yAt(gp);
+      ctx.strokeStyle = 'rgba(35,43,56,.75)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, gy + 0.5);
+      ctx.lineTo(padL + plotW, gy + 0.5);
+      ctx.stroke();
+      ctx.fillStyle = '#6c7789';
+      ctx.fillText(gp.toFixed(st.dec), padL + plotW + 7, gy);
+    }
+
+    // 昨收基准线
+    if (pre != null && isFinite(pre)) {
+      var py = yAt(pre);
+      ctx.strokeStyle = 'rgba(138,149,168,.55)';
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(padL, py + 0.5);
+      ctx.lineTo(padL + plotW, py + 0.5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#8a95a8';
+      ctx.fillText(pre.toFixed(st.dec), padL + plotW + 7, py - 7);
+    }
+
+    var last = pts[pts.length - 1].price;
+    var up = pre == null || last >= pre;
+    var main = up ? '#f6465d' : '#2ebd85';
+
+    // 价格面积
+    var grad = ctx.createLinearGradient(0, padT, 0, padT + priceH);
+    grad.addColorStop(0, up ? 'rgba(246,70,93,.20)' : 'rgba(46,189,133,.20)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.moveTo(xSlot(pts[0].slot), padT + priceH);
+    pts.forEach(function (p) { ctx.lineTo(xSlot(p.slot), yAt(p.price)); });
+    ctx.lineTo(xSlot(pts[pts.length - 1].slot), padT + priceH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // 价格线
+    ctx.strokeStyle = main;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    pts.forEach(function (p, i) {
+      var x = xSlot(p.slot);
+      var y = yAt(p.price);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // 均价线
+    ctx.strokeStyle = 'rgba(240,185,11,.9)';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    var avgStarted = false;
+    pts.forEach(function (p) {
+      if (p.avg == null || !isFinite(p.avg)) return;
+      var ax = xSlot(p.slot);
+      var ay = yAt(p.avg);
+      if (!avgStarted) { ctx.moveTo(ax, ay); avgStarted = true; }
+      else ctx.lineTo(ax, ay);
+    });
+    ctx.stroke();
+
+    // 成交量
+    var barW = Math.max(1, slotW * 0.66);
+    var prevPrice = pre;
+    pts.forEach(function (p) {
+      if (!volMax) return;
+      var vh = Math.max(0.6, (p.vol || 0) / volMax * volH);
+      var vc = p.price >= (prevPrice == null ? p.price : prevPrice) ? 'rgba(246,70,93,.5)' : 'rgba(46,189,133,.5)';
+      ctx.fillStyle = vc;
+      ctx.fillRect(xSlot(p.slot) - barW / 2, volTop + volH - vh, barW, vh);
+      prevPrice = p.price;
+    });
+
+    // 时间刻度
+    ctx.fillStyle = '#6c7789';
+    ctx.font = '10px -apple-system, sans-serif';
+    [[0, '09:30', 'left'], [119.5, '11:30/13:00', 'center'], [239, '15:00', 'right']].forEach(function (t) {
+      ctx.textAlign = t[2];
+      ctx.fillText(t[1], Math.min(padL + plotW, Math.max(padL, xSlot(t[0]))), H - 8);
+    });
+
+    // 十字光标
+    if (trendHover >= 0) {
+      var hp = trendPointAt(trendHover);
+      if (hp) {
+        var hx = xSlot(hp.slot);
+        ctx.strokeStyle = 'rgba(180,195,215,.45)';
+        ctx.setLineDash([3, 3]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(hx, padT);
+        ctx.lineTo(hx, volTop + volH);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(padL, yAt(hp.price));
+        ctx.lineTo(padL + plotW, yAt(hp.price));
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    trendGeo = {
+      padL: padL,
+      slotW: slotW,
+      width: W,
+      points: pts,
+      hi: hi,
+      lo: lo,
+      preClose: pre
+    };
+  }
+
+  function trendPointAt(slot) {
+    if (!trendGeo) return null;
+    var best = null;
+    var bd = 999;
+    trendGeo.points.forEach(function (p) {
+      var d = Math.abs(p.slot - slot);
+      if (d < bd) { bd = d; best = p; }
+    });
+    return bd <= 4 ? best : null;
+  }
+
+  function showTrendTip(slot, x) {
+    var tip = $('chartTip');
+    var p = trendPointAt(slot);
+    if (!p || !trendGeo) {
+      tip.style.display = 'none';
+      return;
+    }
+    var st = trendState;
+    var pct = st.preClose ? (p.price / st.preClose - 1) * 100 : null;
+    tip.innerHTML =
+      '<b>' + p.time.slice(11, 16) + '</b><br>' +
+      '价格 ' + p.price.toFixed(st.dec) + '　' + signTxt(pct, 2, '%') + '<br>' +
+      '均价 ' + (p.avg == null ? '—' : p.avg.toFixed(st.dec)) +
+      '　量 ' + fmtAmount(p.vol * 100);
+    tip.style.display = 'block';
+    var tw = tip.offsetWidth;
+    var left = Math.min(Math.max(x + 12, 4), trendGeo.width - tw - 4);
+    tip.style.left = left + 'px';
+    tip.style.top = '6px';
+  }
+
   function showChartTip(idx, x) {
     var tip = $('chartTip');
     if (!chartGeo || idx < 0 || idx >= chartGeo.n) {
@@ -1904,10 +3009,21 @@
   }
 
   function handleChartPointer(ev) {
-    if (!chartGeo) return;
     var canvas = $('klineCanvas');
     var rect = canvas.getBoundingClientRect();
     var x = ev.clientX - rect.left;
+
+    if (chartMode === 'trend') {
+      if (!trendGeo) return;
+      var slot = Math.round((x - trendGeo.padL) / trendGeo.slotW - 0.5);
+      if (slot < 0 || slot > 239) slot = -1;
+      trendHover = slot;
+      drawChart();
+      showTrendTip(slot, x);
+      return;
+    }
+
+    if (!chartGeo) return;
     var idx = Math.floor((x - chartGeo.padL) / chartGeo.slot);
     if (idx < 0 || idx >= chartGeo.n) idx = -1;
     chartHover = idx;
@@ -1920,30 +3036,48 @@
   function renderParamsText() {
     var r = params.retDays;
     var m = params.maDays;
-    $('signalPageSub').textContent = ETFS.length + ' 只 · ' + r + '日涨幅 / MA' + m;
+    $('signalPageSub').textContent = ETFS.length + ' 只 · ' + r + '日 / MA' + m +
+      ' · 防抖 ' + params.leadGap.toFixed(1) + '%/' + params.leadHold + 's';
     $('sortRetChip').textContent = r + '日涨幅';
     $('sortRankChip').textContent = r + '日排名';
-    $('ruleBuy').innerHTML = '① 六个标的中<b>近' + r + '日涨幅排名第一</b>；② 价格<b>站上' + m + '日均线</b>。同时满足即买入 / 持仓排名第一的强势 ETF。';
-    $('ruleSell').innerHTML = '① 持有标的<b>' + r + '日涨幅跌出第一名</b>；② 价格<b>有效跌破' + m + '日均线</b>。触发即卖出 / 换仓，切换到新的第一名标的。';
+    $('ruleBuy').innerHTML = '① 标的池中<b>近' + r + '日涨幅排名第一</b>；② 价格<b>站上' + m + '日均线</b>。同时满足即买入 / 持仓。';
+    $('ruleSell').innerHTML = '① 持有标的<b>' + r + '日涨幅跌出第一名</b>；② 价格<b>有效跌破' + m + '日均线</b>。触发即卖出 / 换仓；若原持仓仍在均线上方，新第一名需领先 ' + params.leadGap.toFixed(1) + '% 并持续 ' + params.leadHold + ' 秒才换仓。';
+    $('ruleCash').innerHTML = '标的池<b>全部走弱、无一同时满足</b>买入 / 持仓条件时，<b>直接空仓</b>等待。空仓本身就是最高级的风控。';
+  }
+
+  function syncParamInputs() {
+    function setV(id, v) {
+      var el = $(id);
+      if (el && document.activeElement !== el) el.value = v;
+    }
+    setV('retDaysInput', params.retDays);
+    setV('maDaysInput', params.maDays);
+    setV('leadGapInput', params.leadGap);
+    setV('leadHoldInput', params.leadHold);
   }
 
   function setSegActive() {
     function mark(id, value) {
-      Array.prototype.forEach.call($(id).querySelectorAll('button'), function (btn) {
+      var el = $(id);
+      if (!el) return;
+      Array.prototype.forEach.call(el.querySelectorAll('button'), function (btn) {
         btn.classList.toggle('active', parseInt(btn.getAttribute('data-value'), 10) === value);
       });
     }
     mark('retSeg', params.retDays);
     mark('maSeg', params.maDays);
     mark('intervalSeg', state.refreshSec);
+    syncParamInputs();
   }
 
   function applyParams() {
     renderParamsText();
     setSegActive();
+    resetSignalTracking();
     if (Object.keys(state.metrics).length) {
       computeAll();
       computeSignals();
+      trackSignal();
     }
     renderAll();
   }
@@ -1959,7 +3093,8 @@
     syncChartOrder();
     updateChartPickerActive();
     renderChartMeta();
-    drawChart();
+    if (chartMode === 'trend' && currentTab === 'charts') ensureTrend();
+    else drawChart();
     updatePoolText();
   }
 
@@ -2001,6 +3136,11 @@
   }
 
   function updateCountdown() {
+    if (!state.running) {
+      $('countdown').textContent = '已停止';
+      $('timeSub').textContent = '策略已停止 · 自动刷新暂停';
+      return;
+    }
     var hint = '';
     if (state.secLeft > state.refreshSec) {
       hint = state.failCount >= 3 ? '失败降频' : '休市降频';
@@ -2013,6 +3153,30 @@
       : (state.secLeft + ' 秒后自动刷新' + (hint ? '（' + hint + '）' : ''));
   }
 
+  /* ================= 启停开关 ================= */
+
+  function updateRunUI() {
+    var btn = $('runBtn');
+    if (!btn) return;
+    btn.classList.toggle('stop', !!state.running);
+    btn.classList.toggle('start', !state.running);
+    btn.setAttribute('aria-label', state.running ? '停止策略' : '启动策略');
+    $('runText').textContent = state.running ? '停止' : '启动';
+  }
+
+  function setRunning(on) {
+    state.running = !!on;
+    savePrefs();
+    updateRunUI();
+    if (state.running) {
+      state.secLeft = effectiveInterval();
+      refresh(true);
+    } else {
+      state.pendingRefresh = false;
+      updateCountdown();
+    }
+  }
+
   /* ================= 刷新 ================= */
 
   function refresh(manual) {
@@ -2021,7 +3185,7 @@
       return;
     }
     state.busy = true;
-    $('refreshBtn').classList.add('busy');
+    $('runBtn').classList.add('busy');
     setStatus('', '刷新中…');
     updateCountdown();
 
@@ -2031,9 +3195,11 @@
         return true;
       }).catch(function () { return false; });
     });
+    var tencentJob = loadTencentQuotes().catch(function () { return {}; });
 
-    Promise.all(quoteJobs).then(function (results) {
-      var okCount = results.filter(Boolean).length;
+    Promise.all([Promise.all(quoteJobs), tencentJob]).then(function (arr) {
+      applyTencentQuotes(arr[1] || {});
+      var okCount = ETFS.filter(function (etf) { return !!state.quotes[etf.code]; }).length;
       var needKline = manual ||
         Date.now() - state.lastKlineAt > 60000 ||
         Object.keys(state.klines).length < ETFS.length;
@@ -2057,7 +3223,8 @@
 
         computeAll();
         computeSignals();
-        recordSignalChange();
+        var evt = trackSignal();
+        if (evt) computeSignals();
 
         var latest = 0;
         ETFS.forEach(function (etf) {
@@ -2067,9 +3234,12 @@
         state.dataTime = latest || Math.floor(Date.now() / 1000);
 
         renderAll();
+        if (evt && state.running) notifySignalChange(evt);
 
         updateMarketChip();
-        if (okCount === 0) {
+        if (!state.running) {
+          setStatus('', '已停止 · 数据 ' + fmtHMS(latest * 1000));
+        } else if (okCount === 0) {
           setStatus('', '未开盘 · 显示上一交易日收盘');
         } else {
           setStatus('live', '实时 · ' + fmtHMS(latest * 1000));
@@ -2084,13 +3254,13 @@
       state.failCount++;
       state.secLeft = effectiveInterval();
       if (!Object.keys(state.quotes).length) {
-        renderEmpty('行情数据获取失败，请检查网络后点击右上角刷新');
+        renderEmpty('行情数据获取失败，请检查网络后点按右上角启停按钮重试');
         renderHero();
         renderSignalChange();
       }
     }).then(function () {
       state.busy = false;
-      $('refreshBtn').classList.remove('busy');
+      $('runBtn').classList.remove('busy');
       updateCountdown();
       if (state.pendingRefresh) {
         state.pendingRefresh = false;
@@ -2124,7 +3294,8 @@
     if (name === 'charts') {
       requestAnimationFrame(function () {
         renderChartMeta();
-        drawChart();
+        if (chartMode === 'trend') ensureTrend();
+        else drawChart();
       });
     }
   }
@@ -2138,7 +3309,7 @@
       switchTab(btn.getAttribute('data-tab'));
     });
 
-    $('refreshBtn').addEventListener('click', function () { refresh(true); });
+    $('runBtn').addEventListener('click', function () { setRunning(!state.running); });
 
     $('signalList').addEventListener('click', function (e) {
       var card = e.target.closest ? e.target.closest('.etf-card') : null;
@@ -2196,6 +3367,172 @@
       savePrefs();
     });
 
+    function bindNumInput(id, key, min, max, isInt) {
+      var el = $(id);
+      if (!el) return;
+      el.addEventListener('change', function () {
+        var v = parseFloat(el.value);
+        if (!isFinite(v)) { syncParamInputs(); return; }
+        v = Math.max(min, Math.min(max, v));
+        if (key === 'leadGap') params.leadGap = Math.round(v * 10) / 10;
+        else params[key] = Math.round(v);
+        applyParams();
+        savePrefs();
+      });
+    }
+    bindNumInput('retDaysInput', 'retDays', 5, 240, true);
+    bindNumInput('maDaysInput', 'maDays', 5, 240, true);
+    bindNumInput('leadGapInput', 'leadGap', 0, 5, false);
+    bindNumInput('leadHoldInput', 'leadHold', 0, 600, true);
+
+    Array.prototype.forEach.call($('chartMode').querySelectorAll('button'), function (btn) {
+      btn.addEventListener('click', function () {
+        setChartMode(btn.getAttribute('data-mode'));
+      });
+    });
+
+    /* -------- 标的池配置 -------- */
+    $('cfgBtn').addEventListener('click', openConfig);
+    $('cfgX').addEventListener('click', closeConfig);
+    $('cfgCancel').addEventListener('click', closeConfig);
+    $('cfgSave').addEventListener('click', saveConfigPanel);
+    $('cfgMask').addEventListener('click', function (e) {
+      if (e.target === $('cfgMask')) closeConfig();
+    });
+    $('cfgReset').addEventListener('click', function () {
+      if (!window.confirm('恢复默认标的池与参数？尚未保存的修改会丢弃。')) return;
+      cfgDraft = {
+        categories: defaultConfig().categories,
+        retDays: 20, maDays: 28, leadGap: 0.3, leadHold: 60
+      };
+      cfgSearch = {};
+      renderConfigPanel();
+    });
+
+    $('cfgBody').addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('[data-act]') : null;
+      if (!btn || !cfgDraft) return;
+      var act = btn.getAttribute('data-act');
+      var catEl = btn.closest('.cfg-cat');
+      var catId = catEl ? catEl.getAttribute('data-cat') : null;
+      var cat = catId ? cfgCatById(catId) : null;
+      var idx = cat ? cfgDraft.categories.indexOf(cat) : -1;
+
+      if (act === 'addcat') {
+        if (cfgDraft.categories.length >= MAX_CATS) {
+          window.alert('最多 ' + MAX_CATS + ' 个类目');
+          return;
+        }
+        cfgDraft.categories.push({
+          id: 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1000),
+          name: '新类目',
+          role: '自定义',
+          items: []
+        });
+        renderConfigPanel();
+        return;
+      }
+      if (act === 'catup' && idx > 0) {
+        var cu = cfgDraft.categories.splice(idx, 1)[0];
+        cfgDraft.categories.splice(idx - 1, 0, cu);
+        renderConfigPanel();
+        return;
+      }
+      if (act === 'catdown' && idx >= 0 && idx < cfgDraft.categories.length - 1) {
+        var cd = cfgDraft.categories.splice(idx, 1)[0];
+        cfgDraft.categories.splice(idx + 1, 0, cd);
+        renderConfigPanel();
+        return;
+      }
+      if (act === 'catdel' && cat) {
+        if (!window.confirm('删除类目「' + cat.name + '」及其 ' + cat.items.length + ' 只标的？')) return;
+        cfgDraft.categories.splice(idx, 1);
+        delete cfgSearch[catId];
+        renderConfigPanel();
+        return;
+      }
+      if (!cat) return;
+
+      var code = btn.getAttribute('data-code');
+      var itemIdx = -1;
+      cat.items.forEach(function (x, i) { if (x.code === code) itemIdx = i; });
+      if (act === 'itemup' && itemIdx > 0) {
+        var iu = cat.items.splice(itemIdx, 1)[0];
+        cat.items.splice(itemIdx - 1, 0, iu);
+        renderConfigPanel();
+        return;
+      }
+      if (act === 'itemdown' && itemIdx >= 0 && itemIdx < cat.items.length - 1) {
+        var idn = cat.items.splice(itemIdx, 1)[0];
+        cat.items.splice(itemIdx + 1, 0, idn);
+        renderConfigPanel();
+        return;
+      }
+      if (act === 'itemdel' && itemIdx >= 0) {
+        cat.items.splice(itemIdx, 1);
+        renderConfigPanel();
+        return;
+      }
+      if (act === 'searchbtn') {
+        var si = catEl.querySelector('[data-act="search"]');
+        scheduleCfgSearch(catId, si ? si.value : '');
+        return;
+      }
+      if (act === 'pick') {
+        cfgAddItem(catId, code);
+      }
+    });
+
+    $('cfgBody').addEventListener('input', function (e) {
+      var t = e.target;
+      if (!cfgDraft || !t.getAttribute) return;
+      if (t.classList.contains('cfg-cat-name')) {
+        var c = cfgCatById(t.closest('.cfg-cat').getAttribute('data-cat'));
+        if (c) c.name = t.value;
+        return;
+      }
+      if (t.getAttribute('data-act') === 'search') {
+        scheduleCfgSearch(t.getAttribute('data-cat'), t.value);
+        return;
+      }
+      if (t.getAttribute('data-cfgparam')) {
+        var v = parseFloat(t.value);
+        if (isFinite(v)) cfgDraft[t.getAttribute('data-cfgparam')] = v;
+      }
+    });
+
+    $('cfgBody').addEventListener('keydown', function (e) {
+      var t = e.target;
+      if (e.key === 'Enter' && t.getAttribute && t.getAttribute('data-act') === 'search') {
+        e.preventDefault();
+        scheduleCfgSearch(t.getAttribute('data-cat'), t.value);
+        t.blur();
+      }
+    });
+
+    /* -------- 历史信号 -------- */
+    $('histBtn').addEventListener('click', openHistory);
+    $('histX').addEventListener('click', closeHistory);
+    $('histClose').addEventListener('click', closeHistory);
+    $('histMask').addEventListener('click', function (e) {
+      if (e.target === $('histMask')) closeHistory();
+    });
+    Array.prototype.forEach.call($('histFilter').querySelectorAll('.hist-chip'), function (btn) {
+      btn.addEventListener('click', function () {
+        histFilter = btn.getAttribute('data-filter');
+        renderHistory();
+      });
+    });
+    $('histClear').addEventListener('click', function () {
+      if (!window.confirm('清空本机全部历史信号记录？')) return;
+      state.signalHistory = [];
+      saveSignalHistoryAll([]);
+      state.sigStore.list = [];
+      saveSigStore();
+      renderHistory();
+      renderSignalChange();
+    });
+
     $('notifyToggle').addEventListener('click', function () {
       state.notify = !state.notify;
       savePrefs();
@@ -2217,20 +3554,34 @@
     });
 
     $('resetBtn').addEventListener('click', function () {
-      if (!window.confirm('恢复默认标的池与参数？')) return;
-      params = { retDays: 20, maDays: 28 };
+      if (!window.confirm('恢复默认标的池与参数？本机历史信号也会清空。')) return;
+      params = { retDays: 20, maDays: 28, leadGap: 0.3, leadHold: 60 };
+      config = defaultConfig();
+      state.selection = {};
       state.refreshSec = 10;
       state.secLeft = 10;
       state.notify = true;
-      SLOTS.forEach(function (slot) { state.selection[slot.key] = slot.def; });
+      chartMode = 'kline';
+
+      state.sigStore = { date: '', last: null, inited: false, count: 0, list: [] };
+      saveSigStore();
+      state.sigSuppress = true;
+      state.sigPend = null;
+      state.signalHistory = [];
+      saveSignalHistoryAll([]);
+      try { localStorage.removeItem(HOLD_KEY); } catch (e) {}
+
       rebuildEtfs();
       activeChart = ETFS.length ? ETFS[0].code : null;
       state.lastKlineAt = 0;
+      trendState = { code: null, loading: false, error: false, points: [], preClose: null, dec: 3, fetchedAt: 0 };
       buildPoolSelectors();
       buildChartPicker();
+      syncChartModeUI();
       applyParams();
       savePrefs();
       setNotifyUI();
+      renderSignalChange();
       refresh(true);
     });
 
@@ -2269,12 +3620,13 @@
     });
 
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) refresh(false);
+      if (!document.hidden && state.running) refresh(false);
     });
 
     setInterval(function () {
       updateMarketChip();
       if (document.hidden) return;
+      if (!state.running) return;
       if (state.busy) return;
       state.secLeft--;
       if (state.secLeft <= 0) {
@@ -2285,6 +3637,398 @@
     }, 1000);
   }
 
+  /* ================= 配置面板 ================= */
+
+  function cloneJson(o) { return JSON.parse(JSON.stringify(o)); }
+
+  function cfgCatById(id) {
+    if (!cfgDraft) return null;
+    for (var i = 0; i < cfgDraft.categories.length; i++) {
+      if (cfgDraft.categories[i].id === id) return cfgDraft.categories[i];
+    }
+    return null;
+  }
+
+  function cfgFieldHtml(key, label, val, min, max, step, unit) {
+    return '<label class="cfg-field"><span>' + label + '（' + min + '–' + max + unit + '）</span>' +
+      '<input data-cfgparam="' + key + '" type="number" min="' + min + '" max="' + max +
+      '" step="' + step + '" inputmode="' + (step < 1 ? 'decimal' : 'numeric') +
+      '" value="' + val + '"></label>';
+  }
+
+  function cfgCatHtml(cat, idx) {
+    var h = '<div class="cfg-cat" data-cat="' + escAttr(cat.id) + '">';
+    h += '<div class="cfg-cat-head">';
+    h += '<span class="cfg-cat-no">' + (idx + 1) + '</span>';
+    h += '<input class="cfg-cat-name" data-act="rename" maxlength="12" value="' + escAttr(cat.name) + '">';
+    h += '<div class="cfg-cat-tools">';
+    h += '<button data-act="catup"' + (idx === 0 ? ' disabled' : '') + '>↑</button>';
+    h += '<button data-act="catdown"' + (idx === cfgDraft.categories.length - 1 ? ' disabled' : '') + '>↓</button>';
+    h += '<button data-act="catdel"' + (cfgDraft.categories.length <= 1 ? ' disabled' : '') + '>✕</button>';
+    h += '</div></div>';
+
+    if (!cat.items.length) {
+      h += '<div class="cfg-empty">该类目暂无标的，请在下方搜索添加</div>';
+    }
+    cat.items.forEach(function (it, i) {
+      h += '<div class="cfg-item">';
+      h += '<span class="no">' + (i + 1) + '</span>';
+      h += '<span class="nm">' + esc(it.name) + '</span>';
+      h += '<span class="cd">' + it.code + '</span>';
+      h += '<div class="btns">';
+      h += '<button data-act="itemup" data-code="' + it.code + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>';
+      h += '<button data-act="itemdown" data-code="' + it.code + '"' +
+        (i === cat.items.length - 1 ? ' disabled' : '') + '>↓</button>';
+      h += '<button data-act="itemdel" data-code="' + it.code + '">✕</button>';
+      h += '</div></div>';
+    });
+
+    var st = cfgSearch[cat.id];
+    h += '<div class="cfg-add">';
+    h += '<input data-act="search" data-cat="' + escAttr(cat.id) + '" placeholder="搜索 ETF / LOF 名称或代码" value="' +
+      escAttr(st && st.kw ? st.kw : '') + '">';
+    h += '<button data-act="searchbtn" data-cat="' + escAttr(cat.id) + '">搜索</button>';
+    h += '</div>';
+    h += '<div class="cfg-results" id="cfgRes_' + escAttr(cat.id) + '"></div>';
+    h += '</div>';
+    return h;
+  }
+
+  function renderConfigPanel() {
+    if (!cfgDraft) return;
+    var total = 0;
+    cfgDraft.categories.forEach(function (c) { total += c.items.length; });
+    $('cfgHint').textContent = cfgDraft.categories.length + ' 个类目 · ' + total + ' 只标的';
+
+    var html = '<div class="cfg-sec">计算参数</div><div class="cfg-param-grid">';
+    html += cfgFieldHtml('retDays', '涨幅日数', cfgDraft.retDays, 5, 240, 1, '日');
+    html += cfgFieldHtml('maDays', '均线日数', cfgDraft.maDays, 5, 240, 1, '日');
+    html += cfgFieldHtml('leadGap', '领先幅度', cfgDraft.leadGap, 0, 5, 0.1, '%');
+    html += cfgFieldHtml('leadHold', '持续确认', cfgDraft.leadHold, 0, 600, 10, '秒');
+    html += '</div>';
+    html += '<div class="cfg-note">涨幅日数与均线日数支持 5–240 日；换仓防抖仅作用于原持仓仍在均线上方的换仓场景。</div>';
+    html += '<div class="cfg-sec">标的池</div>';
+
+    if (!cfgDraft.categories.length) {
+      html += '<div class="cfg-empty">尚未添加类目，点击下方按钮新建</div>';
+    }
+    cfgDraft.categories.forEach(function (cat, idx) { html += cfgCatHtml(cat, idx); });
+    html += '<button class="cfg-addcat" data-act="addcat">+ 添加类目（最多 ' + MAX_CATS + ' 个）</button>';
+    $('cfgBody').innerHTML = html;
+
+    cfgDraft.categories.forEach(function (cat) {
+      var st = cfgSearch[cat.id];
+      if (st && st.list && st.list.length) renderCfgResults(cat.id);
+    });
+  }
+
+  function openConfig() {
+    cfgDraft = {
+      categories: cloneJson(config.categories),
+      retDays: params.retDays,
+      maDays: params.maDays,
+      leadGap: params.leadGap,
+      leadHold: params.leadHold
+    };
+    cfgSearch = {};
+    $('cfgMask').classList.add('open');
+    $('cfgMask').setAttribute('aria-hidden', 'false');
+    document.body.classList.add('locked');
+    renderConfigPanel();
+  }
+
+  function closeConfig() {
+    $('cfgMask').classList.remove('open');
+    $('cfgMask').setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('locked');
+    cfgDraft = null;
+    cfgSearch = {};
+  }
+
+  function renderCfgResults(catId) {
+    var box = document.getElementById('cfgRes_' + catId);
+    var st = cfgSearch[catId];
+    if (!box) return;
+    if (!st || !st.list || !st.list.length) {
+      box.innerHTML = '<div class="cfg-msg">没有找到匹配的 ETF / LOF，可直接输入 6 位代码搜索</div>';
+      return;
+    }
+    var html = '';
+    st.list.forEach(function (it) {
+      var exists = false;
+      cfgDraft.categories.forEach(function (c) {
+        c.items.forEach(function (x) { if (x.code === it.code) exists = true; });
+      });
+      html += '<button class="cfg-res" data-act="pick" data-cat="' + escAttr(catId) + '" data-code="' +
+        it.code + '"' + (exists ? ' style="opacity:.45"' : '') + '>';
+      html += '<span class="s-name">' + esc(it.name) + '</span>';
+      html += '<span class="s-code">' + it.code + '</span>';
+      html += '<span class="s-mv">' + (exists ? '已添加' : (isT0(it.code) ? 'T+0' : 'T+1')) + '</span>';
+      html += '</button>';
+    });
+    box.innerHTML = html;
+  }
+
+  function scheduleCfgSearch(catId, kw) {
+    var st = cfgSearch[catId];
+    if (!st) { st = { kw: '', list: [], seq: 0, timer: null }; cfgSearch[catId] = st; }
+    st.kw = kw;
+    clearTimeout(st.timer);
+    var box = document.getElementById('cfgRes_' + catId);
+    if (!box) return;
+    kw = String(kw || '').trim();
+    if (!kw) {
+      st.list = [];
+      st.seq++;
+      box.innerHTML = '';
+      return;
+    }
+    box.innerHTML = '<div class="cfg-msg">搜索中…</div>';
+    st.timer = setTimeout(function () {
+      var seq = ++st.seq;
+      searchSecurities(kw).then(function (list) {
+        if (cfgSearch[catId] !== st || st.seq !== seq) return;
+        st.list = list;
+        renderCfgResults(catId);
+      }).catch(function () {
+        if (st.seq !== seq) return;
+        var b = document.getElementById('cfgRes_' + catId);
+        if (b) b.innerHTML = '<div class="cfg-msg">搜索失败，请检查网络后重试</div>';
+      });
+    }, 320);
+  }
+
+  function isEtfLofCode(code) {
+    return /^(15|16|50|51|56|58)\d{4}$/.test(String(code || ''));
+  }
+
+  function isEtfLofName(name) {
+    var n = String(name || '').toUpperCase();
+    return n.indexOf('ETF') >= 0 || n.indexOf('LOF') >= 0;
+  }
+
+  function sinaSearchEtf(kw) {
+    var varName = '__etf_sina_cfg_' + Date.now();
+    var url = 'https://suggest3.sinajs.cn/suggest/type=22,23&key=' +
+      encodeURIComponent(kw) + '&name=' + varName;
+    return new Promise(function (resolve) {
+      var script = document.createElement('script');
+      var done = false;
+      var timer = setTimeout(finish, 7000);
+      function finish() {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (script.parentNode) script.parentNode.removeChild(script);
+        var raw = window[varName] || '';
+        var out = [];
+        var seen = {};
+        String(raw).split(';').forEach(function (row) {
+          var f = row.split(',');
+          var code = String(f[2] || '').trim();
+          var name = String(f[4] || f[0] || '').trim();
+          if (!/^\d{6}$/.test(code) || seen[code] || !name) return;
+          if (!isEtfLofCode(code) && !isEtfLofName(name)) return;
+          seen[code] = true;
+          out.push({ code: code, secid: secidOfCode(code), name: name });
+        });
+        resolve(out.slice(0, 30));
+      }
+      window[varName] = '';
+      script.charset = 'gbk';
+      script.onload = finish;
+      script.onerror = finish;
+      script.src = url;
+      document.body.appendChild(script);
+    });
+  }
+
+  function searchSecurities(kw) {
+    kw = String(kw || '').trim();
+    if (!kw) return Promise.resolve([]);
+    var url = 'https://searchapi.eastmoney.com/api/suggest/get?input=' +
+      encodeURIComponent(kw) + '&type=14&count=50&token=D43BF722C8E33BDC906FB84D85E326E8';
+    return request(url).then(function (res) {
+      var arr = (res && res.QuotationCodeTable && res.QuotationCodeTable.Data) || [];
+      var out = [];
+      var seen = {};
+      arr.forEach(function (d) {
+        if (!d || !d.Code || !d.QuoteID) return;
+        var code = String(d.Code);
+        var name = String(d.Name || code);
+        if (!isEtfLofCode(code) && !isEtfLofName(name)) return;
+        if (seen[code]) return;
+        seen[code] = true;
+        out.push({ code: code, secid: String(d.QuoteID), name: name });
+      });
+      return out;
+    }).catch(function () {
+      return [];
+    }).then(function (list) {
+      return list.length ? list.slice(0, 30) : sinaSearchEtf(kw);
+    });
+  }
+
+  function cfgAddItem(catId, code) {
+    var cat = cfgCatById(catId);
+    var st = cfgSearch[catId];
+    if (!cat || !st) return;
+    var item = null;
+    st.list.forEach(function (x) { if (x.code === code) item = x; });
+    if (!item) return;
+    if (cat.items.length >= MAX_ITEMS) {
+      window.alert('每个类目最多 ' + MAX_ITEMS + ' 只标的');
+      return;
+    }
+    var dup = false;
+    cfgDraft.categories.forEach(function (c) {
+      c.items.forEach(function (x) { if (x.code === code) dup = true; });
+    });
+    if (dup) {
+      window.alert('该标的已在标的池中');
+      return;
+    }
+    cat.items.push({
+      code: item.code,
+      secid: item.secid || secidOfCode(item.code),
+      name: item.name
+    });
+    st.list = [];
+    st.kw = '';
+    renderConfigPanel();
+  }
+
+  function cfgReadParams() {
+    if (!cfgDraft) return;
+    var box = $('cfgBody');
+    ['retDays', 'maDays', 'leadGap', 'leadHold'].forEach(function (k) {
+      var el = box.querySelector('[data-cfgparam="' + k + '"]');
+      if (!el) return;
+      var v = parseFloat(el.value);
+      if (isFinite(v)) cfgDraft[k] = v;
+    });
+  }
+
+  function clampNum(v, min, max, def) {
+    if (!isFinite(v)) return def;
+    return Math.max(min, Math.min(max, v));
+  }
+
+  function saveConfigPanel() {
+    cfgReadParams();
+    var cats = [];
+    cfgDraft.categories.forEach(function (c, i) {
+      if (!c.items.length) return;
+      cats.push({
+        id: c.id,
+        name: String(c.name || '').trim() || ('类目' + (i + 1)),
+        role: c.role || '自定义',
+        items: c.items.slice(0, MAX_ITEMS)
+      });
+    });
+    if (!cats.length) {
+      window.alert('请至少保留一个包含标的的类目');
+      return;
+    }
+
+    params.retDays = Math.round(clampNum(cfgDraft.retDays, 5, 240, 20));
+    params.maDays = Math.round(clampNum(cfgDraft.maDays, 5, 240, 28));
+    params.leadGap = Math.round(clampNum(cfgDraft.leadGap, 0, 5, 0.3) * 10) / 10;
+    params.leadHold = Math.round(clampNum(cfgDraft.leadHold, 0, 600, 60));
+
+    var oldSel = {};
+    config.categories.forEach(function (c) { oldSel[c.id] = state.selection[c.id]; });
+    config = normalizeConfig({ categories: cats });
+
+    state.selection = {};
+    config.categories.forEach(function (cat) {
+      var code = oldSel[cat.id];
+      var found = false;
+      cat.items.forEach(function (x) { if (x.code === code) found = true; });
+      state.selection[cat.id] = found ? code : cat.items[0].code;
+    });
+
+    try { localStorage.removeItem(HOLD_KEY); } catch (e) {}
+    state.streak = {};
+    resetSignalTracking();
+    closeConfig();
+    rebuildEtfs();
+    state.lastKlineAt = 0;
+    buildPoolSelectors();
+    buildChartPicker();
+    state.sigStore.date = '';
+    renderParamsText();
+    setSegActive();
+    computeAll();
+    if (Object.keys(state.metrics).length) {
+      computeSignals();
+      trackSignal();
+    }
+    renderAll();
+    savePrefs();
+    refresh(true);
+  }
+
+  /* ================= 历史信号面板 ================= */
+
+  function openHistory() {
+    $('histMask').classList.add('open');
+    $('histMask').setAttribute('aria-hidden', 'false');
+    document.body.classList.add('locked');
+    renderHistory();
+  }
+
+  function closeHistory() {
+    $('histMask').classList.remove('open');
+    $('histMask').setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('locked');
+  }
+
+  function renderHistory() {
+    var list = state.signalHistory.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+    if (histFilter !== 'all') {
+      list = list.filter(function (x) { return x.type === histFilter; });
+    }
+    var html = '';
+    list.forEach(function (item) {
+      var d = eventDetail(item);
+      if (!d) return;
+      var day = item.date || beijingDate(new Date(item.ts || Date.now()));
+      var desc;
+      if (d.type === 'switch') {
+        desc = '卖出 <b class="down">' + esc(d.sell.name) + '</b> → 买入 <b class="up">' + esc(d.buy.name) + '</b>';
+      } else if (d.type === 'buy') {
+        desc = '买入 <b class="up">' + esc(d.buy.name) + '</b>';
+      } else {
+        desc = '卖出 <b class="down">' + esc(d.sell.name) + '</b>';
+      }
+      var meta = [];
+      if (d.gap != null) meta.push('领先 ' + d.gap.toFixed(2) + '%');
+      if (d.holdSecs != null) meta.push('确认 ' + d.holdSecs + ' 秒');
+      if (item.from && item.to) meta.push(item.from + ' → ' + item.to);
+      html += '<div class="hist-item">';
+      html += '<div class="hist-time">' + day.slice(5) + '<br>' + esc(d.time) + '</div>';
+      html += '<span class="hist-badge ' + d.type + '">' + d.badge + '</span>';
+      html += '<div class="hist-main"><div class="hist-desc">' + desc + '</div>' +
+        (meta.length ? '<div class="hist-meta">' + esc(meta.join(' · ')) + '</div>' : '') +
+        '</div></div>';
+    });
+    $('histList').innerHTML = html || '<div class="hist-empty">暂无历史信号记录<br>信号变化会自动保存在本机</div>';
+    $('histSub').textContent = '本机共 ' + state.signalHistory.length + ' 条记录';
+    Array.prototype.forEach.call($('histFilter').querySelectorAll('button'), function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-filter') === histFilter);
+    });
+  }
+
+  function syncChartModeUI() {
+    Array.prototype.forEach.call($('chartMode').querySelectorAll('button'), function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-mode') === chartMode);
+    });
+    $('chartHint').textContent = chartMode === 'trend'
+      ? '点按 / 滑动查看分时价格、均价与涨跌幅'
+      : '点按 / 滑动图表查看每日开高低收与均线';
+  }
+
   /* ================= 初始化 ================= */
 
   restorePrefs();
@@ -2293,12 +4037,11 @@
   buildChartPicker();
   renderParamsText();
   setSegActive();
+  syncChartModeUI();
+  state.signalHistory = loadSignalHistoryAll();
   bindEvents();
   setNotifyUI();
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(function () {});
-  }
-  state.signalHistory = loadSignalHistory();
+  updateRunUI();
   renderHero();
   renderSignalChange();
   renderSignalList();
