@@ -513,6 +513,17 @@
   .cfg-res .s-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cfg-res .s-code{flex:0 0 auto;font-size:10.5px;color:var(--muted);font-family:"SF Mono",Consolas,monospace}
   .cfg-res .s-mv{flex:0 0 auto;font-size:10.5px;color:var(--muted);font-family:"SF Mono",Consolas,monospace}
+  .cfg-item .cfg-main{flex:1;min-width:0}
+  .cfg-item .cfg-line1{display:flex;align-items:baseline;gap:6px;min-width:0}
+  .cfg-item .mt{
+    display:block;margin-top:2px;font-size:9.5px;color:var(--muted);
+    font-family:"SF Mono",Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .cfg-res{flex-wrap:wrap}
+  .cfg-res .s-meta{
+    flex:0 0 100%;margin-top:1px;font-size:9.5px;color:var(--muted);
+    font-family:"SF Mono",Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
   .cfg-msg{font-size:10.5px;color:var(--muted);padding:4px 2px}
   .cfg-empty{
     padding:12px;margin-bottom:8px;border-radius:9px;border:1px dashed var(--line);
@@ -3637,6 +3648,214 @@
     }, 1000);
   }
 
+  /* ================= 标的元数据（T+0 / 市值 / 上市日数） ================= */
+
+  var META_KEY = 'etf_tab_mobile_meta_v1';
+  var secMeta = (function () {
+    try {
+      var o = JSON.parse(localStorage.getItem(META_KEY) || 'null');
+      if (o && typeof o === 'object') return o;
+    } catch (e) {}
+    return {};
+  })();
+  var metaQueue = [];
+  var metaPending = {};
+  var metaTimer = null;
+  var metaFlushTimer = null;
+  var metaWaiters = [];
+  var metaDirty = false;
+  var metaFlushAt = 0;
+
+  function saveMetaCache() {
+    try { localStorage.setItem(META_KEY, JSON.stringify(secMeta)); } catch (e) {}
+  }
+
+  function metaFresh(code) {
+    var m = secMeta[code];
+    return !!(m && m.at && Date.now() - m.at < 6 * 3600 * 1000);
+  }
+
+  function ensureMeta(codes) {
+    var list = [];
+    (codes || []).forEach(function (c) {
+      if (c && list.indexOf(c) < 0) list.push(c);
+    });
+    updateMetaCells();
+    if (!list.length) return Promise.resolve();
+
+    var mvCodes = list.filter(function (c) {
+      var m = secMeta[c];
+      return (!m || m.mv == null) && !metaFresh(c);
+    });
+    if (mvCodes.length) {
+      tencentQuoteBatch(mvCodes).then(function (map) {
+        var hit = false;
+        Object.keys(map).forEach(function (c) {
+          var cur = secMeta[c] || {};
+          if (map[c] && map[c].mv != null) cur.mv = map[c].mv;
+          if (!cur.at) cur.at = Date.now();
+          secMeta[c] = cur;
+          hit = true;
+        });
+        if (hit) { saveMetaCache(); metaDirty = true; metaFlush(); }
+      }).catch(function () {});
+    }
+
+    var added = false;
+    list.forEach(function (c) {
+      var m = secMeta[c];
+      if ((m && m.ld != null) || metaPending[c] || metaQueue.indexOf(c) >= 0 || metaFresh(c)) return;
+      metaQueue.push(c);
+      added = true;
+    });
+    var p = new Promise(function (res) { metaWaiters.push(res); });
+    if (added && !metaTimer) metaTimer = setTimeout(metaPump, 0);
+    else if (!added && !metaTimer) setTimeout(flushMetaWaiters, 0);
+    return p;
+  }
+
+  function flushMetaWaiters() {
+    var ws = metaWaiters;
+    metaWaiters = [];
+    ws.forEach(function (f) { f(); });
+  }
+
+  function metaPump() {
+    metaTimer = null;
+    if (!metaQueue.length) { flushMetaWaiters(); return; }
+    var code = metaQueue.shift();
+    metaPending[code] = true;
+    fetchListedDate(code).then(function (ld) {
+      var cur = secMeta[code] || {};
+      if (ld) cur.ld = ld;
+      cur.at = Date.now();
+      secMeta[code] = cur;
+      saveMetaCache();
+      metaDirty = true;
+      metaFlush();
+    }).catch(function () {
+      var cur = secMeta[code] || {};
+      cur.at = Date.now();
+      secMeta[code] = cur;
+    }).then(function () {
+      delete metaPending[code];
+      metaTimer = setTimeout(metaPump, 160);
+    });
+  }
+
+  function metaFlush(force) {
+    if (!metaDirty) return;
+    var now = Date.now();
+    if (!force && now - metaFlushAt < 400) {
+      if (!metaFlushTimer) {
+        metaFlushTimer = setTimeout(function () { metaFlushTimer = null; metaFlush(true); }, 420);
+      }
+      return;
+    }
+    metaFlushAt = now;
+    metaDirty = false;
+    updateMetaCells();
+  }
+
+  function updateMetaCells() {
+    var cells = document.querySelectorAll('[data-meta]');
+    Array.prototype.forEach.call(cells, function (el) {
+      var txt = metaText(el.getAttribute('data-meta'));
+      if (el.textContent !== txt) el.textContent = txt;
+    });
+  }
+
+  function txSymbol(code) {
+    return (secidOfCode(code).charAt(0) === '1' ? 'sh' : 'sz') + code;
+  }
+
+  /* 批量取腾讯行情中的流通市值（字段 45，单位：亿元） */
+  function tencentQuoteBatch(codes) {
+    var syms = codes.map(txSymbol);
+    return new Promise(function (resolve) {
+      var s = document.createElement('script');
+      var done = false;
+      var timer = setTimeout(finish, 7000);
+      function finish() {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (s.parentNode) s.parentNode.removeChild(s);
+        var out = {};
+        codes.forEach(function (code, i) {
+          var raw = window['v_' + syms[i]];
+          var mv = null;
+          if (raw) {
+            var a = String(raw).split('~');
+            if (a.length >= 46) {
+              var v = parseFloat(a[45]);
+              if (isFinite(v) && v > 0) mv = v * 1e8;
+            }
+          }
+          out[code] = { mv: mv };
+        });
+        resolve(out);
+      }
+      s.onload = finish;
+      s.onerror = finish;
+      s.src = 'https://qt.gtimg.cn/q=' + syms.join(',') + '&r=' + Math.random();
+      document.body.appendChild(s);
+    });
+  }
+
+  function txKlineJson(param) {
+    return requestJson('https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=' + param)
+      .catch(function () {
+        return requestJson('https://proxy.finance.qq.com/ifzqgtimg/appstock/app/fqkline/get?param=' + param);
+      });
+  }
+
+  /* 用腾讯月线定位上市月份，再用该月日线取到上市首日 */
+  function fetchListedDate(code) {
+    var sym = txSymbol(code);
+    return txKlineJson(sym + ',month,,,640,qfq').then(function (res) {
+      var node = res && res.data && res.data[sym];
+      var rows = node && (node.qfqmonth || node.month);
+      if (!rows || !rows.length) throw new Error('no month kline');
+      var first = String(rows[0][0] || '');
+      if (!/^\d{4}-\d{2}/.test(first)) throw new Error('bad month');
+      var ym = first.slice(0, 7);
+      return txKlineJson(sym + ',day,' + ym + '-01,' + ym + '-31,60,qfq').then(function (r2) {
+        var n2 = r2 && r2.data && r2.data[sym];
+        var rows2 = n2 && (n2.qfqday || n2.day);
+        var day = (rows2 && rows2.length) ? String(rows2[0][0]) : first;
+        var s = day.replace(/-/g, '').slice(0, 8);
+        return /^\d{8}$/.test(s) ? Number(s) : null;
+      });
+    });
+  }
+
+  function metaText(code) {
+    var m = secMeta[code] || {};
+    return (isT0(code) ? 'T+0' : 'T+1') +
+      ' · 市值 ' + fmtMv(m.mv) +
+      ' · 上市 ' + fmtListedYears(m.ld);
+  }
+
+  function fmtMv(v) {
+    if (v == null || !isFinite(v) || v <= 0) return '—';
+    var yi = v / 1e8;
+    if (yi >= 100) return Math.round(yi) + '亿';
+    if (yi >= 10) return yi.toFixed(1) + '亿';
+    return yi.toFixed(2) + '亿';
+  }
+
+  function fmtListedYears(ld) {
+    var s = String(ld || '');
+    if (!/^\d{8}$/.test(s)) return '—';
+    var start = Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8));
+    var now = new Date();
+    var today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    var days = Math.floor((today - start) / 86400000);
+    if (!isFinite(days) || days < 0) return '—';
+    return Math.floor(days / 365) + '年' + (days % 365) + '天';
+  }
+
   /* ================= 配置面板 ================= */
 
   function cloneJson(o) { return JSON.parse(JSON.stringify(o)); }
@@ -3673,8 +3892,11 @@
     cat.items.forEach(function (it, i) {
       h += '<div class="cfg-item">';
       h += '<span class="no">' + (i + 1) + '</span>';
+      h += '<div class="cfg-main"><div class="cfg-line1">';
       h += '<span class="nm">' + esc(it.name) + '</span>';
       h += '<span class="cd">' + it.code + '</span>';
+      h += '</div>';
+      h += '<span class="mt" data-meta="' + escAttr(it.code) + '">' + metaText(it.code) + '</span></div>';
       h += '<div class="btns">';
       h += '<button data-act="itemup" data-code="' + it.code + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>';
       h += '<button data-act="itemdown" data-code="' + it.code + '"' +
@@ -3735,6 +3957,11 @@
     $('cfgMask').setAttribute('aria-hidden', 'false');
     document.body.classList.add('locked');
     renderConfigPanel();
+    var codes = [];
+    cfgDraft.categories.forEach(function (c) {
+      c.items.forEach(function (x) { codes.push(x.code); });
+    });
+    ensureMeta(codes);
   }
 
   function closeConfig() {
@@ -3763,10 +3990,12 @@
         it.code + '"' + (exists ? ' style="opacity:.45"' : '') + '>';
       html += '<span class="s-name">' + esc(it.name) + '</span>';
       html += '<span class="s-code">' + it.code + '</span>';
-      html += '<span class="s-mv">' + (exists ? '已添加' : (isT0(it.code) ? 'T+0' : 'T+1')) + '</span>';
+      html += '<span class="s-mv">' + (exists ? '已添加' : '添加') + '</span>';
+      html += '<span class="s-meta" data-meta="' + escAttr(it.code) + '">' + metaText(it.code) + '</span>';
       html += '</button>';
     });
     box.innerHTML = html;
+    ensureMeta(st.list.map(function (x) { return x.code; }));
   }
 
   function scheduleCfgSearch(catId, kw) {
@@ -3896,6 +4125,7 @@
     st.list = [];
     st.kw = '';
     renderConfigPanel();
+    ensureMeta([item.code]);
   }
 
   function cfgReadParams() {
